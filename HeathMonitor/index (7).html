@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediCore Health — Patient Monitoring System</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  :root {
+    --navy: #0d1b2a;
+    --navy-mid: #1a3a5c;
+    --blue: #1a6eb5;
+    --blue-light: #e8f2fb;
+    --success: #0d7a4e;
+    --success-bg: #e8f7f1;
+    --danger: #c0392b;
+    --danger-bg: #fdecea;
+    --warning: #d97706;
+    --warning-bg: #fef3c7;
+    --text: #0d1b2a;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --bg: #f0f4f8;
+    --card: #ffffff;
+    --sidebar-w: 230px;
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  .sidebar {
+    width: var(--sidebar-w); background: var(--navy); color: #fff;
+    display: flex; flex-direction: column; position: fixed; top: 0; left: 0;
+    height: 100vh; z-index: 100; transition: transform 0.3s;
+  }
+  .sidebar-logo { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .logo-mark { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; color: #fff; }
+  .logo-sub  { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 3px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+  .nav-section-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; color: rgba(255,255,255,0.3); padding: 14px 20px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+    font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.65);
+    cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .nav-item.active { background: rgba(26,110,181,0.25); color: #fff; border-left-color: var(--blue); }
+  .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .nav-item.nav-protected { display: none; }
+  .nav-section-label.nav-protected { display: none; }
+  body.admin-logged-in .nav-item.nav-protected { display: flex; }
+  body.admin-logged-in .nav-section-label.nav-protected { display: block; }
+
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: rgba(255,255,255,0.4); }
+  .sidebar-footer strong { display: block; color: rgba(255,255,255,0.7); margin-bottom: 3px; }
+
+  .main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+  .topbar {
+    height: 56px; background: var(--card); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-title { font-size: 15px; font-weight: 600; color: var(--navy); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .topbar-time { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+
+  .status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+  .status-pill.online  { background: var(--success-bg); color: var(--success); }
+  .status-pill.offline { background: #f3f4f6; color: var(--text-muted); }
+  .status-pill.simulated { background: var(--warning-bg); color: var(--warning); }
+  .status-pill.connecting { background: #eff6ff; color: var(--blue); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .login-btn {
+    display: flex; align-items: center; gap: 7px; padding: 8px 16px;
+    background: var(--navy); color: #fff; border: none; border-radius: 7px;
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font);
+    transition: background 0.15s; letter-spacing: 0.3px;
+  }
+  .login-btn:hover { background: var(--navy-mid); }
+  .login-btn.logout { background: transparent; color: var(--danger); border: 1.5px solid var(--danger); }
+  .login-btn.logout:hover { background: var(--danger-bg); }
+  .admin-badge {
+    display: flex; align-items: center; gap: 7px; padding: 6px 12px;
+    background: var(--success-bg); color: var(--success); border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+  }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(13,27,42,0.65); backdrop-filter: blur(4px);
+    z-index: 999; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: all; }
+  .modal-box {
+    background: #fff; border-radius: 14px; width: 100%; max-width: 400px;
+    box-shadow: 0 24px 60px rgba(13,27,42,0.25); padding: 40px 36px;
+    transform: translateY(16px); transition: transform 0.25s;
+  }
+  .modal-overlay.show .modal-box { transform: translateY(0); }
+  .modal-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  .modal-logo-mark { width: 36px; height: 36px; background: var(--navy); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .modal-logo-mark svg { color: #fff; }
+  .modal-logo-text { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .modal-logo-sub { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+  .modal-title { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .modal-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 24px; }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label { font-size: 11px; font-weight: 600; color: var(--navy); display: block; margin-bottom: 6px; letter-spacing: 0.3px; }
+  .modal-field input {
+    width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-family: var(--font); color: var(--text); outline: none; transition: border 0.15s;
+  }
+  .modal-field input:focus { border-color: var(--blue); }
+  .modal-error { font-size: 11px; color: var(--danger); margin-bottom: 12px; display: none; padding: 8px 12px; background: var(--danger-bg); border-radius: 6px; }
+  .modal-error.show { display: block; }
+  .modal-submit {
+    width: 100%; padding: 12px; background: var(--navy); color: #fff; border: none;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: var(--font);
+    transition: background 0.15s; margin-top: 4px;
+  }
+  .modal-submit:hover { background: var(--navy-mid); }
+  .modal-hint { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 16px; }
+
+  .page-section { display: none; }
+  .page-section.active { display: block; }
+  .section-inner { padding: 28px 28px 40px; max-width: 1200px; }
+
+  .home-hero {
+    background: linear-gradient(135deg, var(--navy) 0%, #1a3a5c 100%);
+    border-radius: 14px; padding: 40px 44px; color: #fff; margin-bottom: 24px;
+    position: relative; overflow: hidden;
+  }
+  .home-hero::before {
+    content: ''; position: absolute; right: -60px; top: -60px;
+    width: 280px; height: 280px; border-radius: 50%;
+    background: rgba(26,110,181,0.15);
+  }
+  .home-hero::after {
+    content: ''; position: absolute; right: 80px; bottom: -80px;
+    width: 180px; height: 180px; border-radius: 50%;
+    background: rgba(26,110,181,0.1);
+  }
+  .hero-tag { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 14px; }
+  .home-hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 10px; line-height: 1.25; }
+  .home-hero p  { font-size: 13px; color: rgba(255,255,255,0.65); max-width: 640px; line-height: 1.7; margin-bottom: 32px; }
+  .hero-stats { display: flex; align-items: center; gap: 0; }
+  .hero-stat-val   { font-size: 28px; font-weight: 700; font-family: var(--mono); }
+  .hero-stat-label { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 0.5px; margin-top: 3px; text-transform: uppercase; }
+  .hero-divider { width: 1px; height: 40px; background: rgba(255,255,255,0.15); margin: 0 28px; }
+
+  .home-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 16px; margin-bottom: 20px; }
+  .info-card { background: var(--card); border-radius: 12px; padding: 24px; border: 1px solid var(--border); }
+  .info-card-icon { width: 44px; height: 44px; border-radius: 10px; background: var(--blue-light); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .info-card-icon svg { width: 22px; height: 22px; color: var(--blue); }
+  .info-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .info-card p  { font-size: 12px; color: var(--text-muted); line-height: 1.7; }
+
+  .system-strip { background: var(--card); border-radius: 12px; border: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 0; overflow: hidden; }
+  .strip-item { flex: 1; min-width: 180px; display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-right: 1px solid var(--border); }
+  .strip-item:last-child { border-right: none; }
+  .strip-dot { width: 9px; height: 9px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
+  .strip-dot.on   { background: var(--success); box-shadow: 0 0 0 3px rgba(13,122,78,0.15); animation: pulse 2s infinite; }
+  .strip-dot.warn { background: var(--warning); }
+  .strip-dot.off  { background: var(--danger); }
+  .strip-label { font-size: 12px; font-weight: 600; color: var(--navy); }
+  .strip-sub   { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  .section-header { margin-bottom: 24px; }
+  .section-header h1 { font-size: 22px; font-weight: 700; }
+  .section-header p  { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  .flex-between { display: flex; justify-content: space-between; align-items: flex-start; }
+
+  .patient-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+  .ptab {
+    padding: 8px 16px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--card); font-size: 12px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; font-family: var(--font); transition: all 0.15s;
+  }
+  .ptab:hover { border-color: var(--blue); color: var(--blue); }
+  .ptab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  .patient-topbar {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
+  }
+  .patient-name-block h2 { font-size: 18px; font-weight: 700; }
+  .patient-meta { display: flex; gap: 16px; margin-top: 5px; flex-wrap: wrap; }
+  .patient-meta span { font-size: 12px; color: var(--text-muted); }
+  .patient-meta strong { color: var(--navy); }
+
+  .vitals-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 14px; margin-bottom: 20px; }
+  .vital-card { background: var(--card); border-radius: 12px; padding: 18px 20px; border: 1.5px solid var(--border); }
+  .vital-card.success { border-color: rgba(13,122,78,0.35); background: rgba(13,122,78,0.03); }
+  .vital-card.danger  { border-color: rgba(192,57,43,0.35);  background: rgba(192,57,43,0.03); }
+  .vital-label  { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 8px; }
+  .vital-value  { font-size: 34px; font-weight: 700; font-family: var(--mono); color: var(--navy); }
+  .vital-unit   { font-size: 13px; color: var(--text-muted); margin-left: 4px; }
+  .vital-status { font-size: 11px; font-weight: 600; margin-top: 6px; color: var(--success); }
+  .vital-range  { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 14px; margin-bottom: 20px; }
+  .chart-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .chart-box-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  canvas { height: 130px !important; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .card-title  { font-size: 13px; font-weight: 600; }
+  .card-body   { padding: 18px; }
+
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+  .badge-info    { background: var(--blue-light); color: var(--blue); }
+  .badge-neutral { background: #f3f4f6; color: #4b5563; }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning); }
+  .badge-danger  { background: var(--danger-bg);  color: var(--danger); }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
+  .detail-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px solid #f3f4f6; }
+  .detail-key { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+  .detail-val { font-size: 12px; font-weight: 600; color: var(--navy); text-align: right; max-width: 220px; }
+
+  .edit-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #eff6ff; border: 1.5px dashed #93c5fd; border-radius: 10px;
+    padding: 10px 16px; margin-bottom: 16px;
+  }
+  .edit-bar-text { font-size: 12px; color: var(--blue); font-weight: 500; }
+  .edit-bar-btns { display: flex; gap: 8px; }
+  .edit-btn {
+    padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--font); border: none; transition: all 0.15s;
+  }
+  .edit-btn.edit  { background: var(--navy); color: #fff; }
+  .edit-btn.save  { background: var(--success); color: #fff; display: none; }
+  .edit-btn.cancel{ background: #f3f4f6; color: var(--text-muted); display: none; }
+  .detail-val input.edit-input {
+    border: 1.5px solid var(--blue); border-radius: 6px; padding: 4px 8px;
+    font-size: 12px; font-weight: 600; color: var(--navy); font-family: var(--font);
+    background: #fff; outline: none; width: 200px; text-align: right;
+  }
+
+  .security-status-bar {
+    border-radius: 12px; padding: 16px 20px; display: flex;
+    justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+  }
+  .security-status-bar.secure { background: var(--success-bg); border: 1.5px solid rgba(13,122,78,0.2); }
+  .security-status-bar.attack { background: var(--danger-bg);  border: 1.5px solid rgba(192,57,43,0.2); }
+  .sec-bar-left  { display: flex; align-items: center; gap: 14px; }
+  .sec-bar-icon  { width: 40px; height: 40px; border-radius: 10px; background: rgba(13,122,78,0.12); display: flex; align-items: center; justify-content: center; color: var(--success); }
+  .sec-bar-title { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .sec-bar-sub   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .sec-metrics   { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .sec-metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .sec-metric-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+  .sec-metric-value { font-size: 28px; font-weight: 700; font-family: var(--mono); color: var(--navy); margin: 6px 0 2px; }
+  .sec-metric-sub   { font-size: 10px; color: var(--text-muted); }
+  .sec-layers { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 14px; margin-bottom: 20px; }
+  .sec-layer-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .sec-layer-head { padding: 14px 18px; border-bottom: 1px solid var(--border); background: #f9fafb; }
+  .sec-layer-head h4 { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .sec-layer-head p  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .sec-layer-body { padding: 4px 0; }
+  .sec-layer-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 18px; border-bottom: 1px solid #f9fafb; }
+  .sec-layer-key { font-size: 11px; color: var(--text-muted); }
+  .sec-layer-val { font-size: 11px; font-weight: 600; color: var(--navy); text-align: right; }
+  .sec-two-col { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+
+  .attack-table-controls {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 18px; border-bottom: 1px solid var(--border); background: #f9fafb; flex-wrap: wrap; gap: 8px;
+  }
+  .attack-table-controls label { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+  .attack-limit-select {
+    padding: 4px 10px; border: 1.5px solid var(--border); border-radius: 6px;
+    font-size: 12px; font-family: var(--font); color: var(--navy); outline: none;
+    cursor: pointer; background: #fff; transition: border 0.15s;
+  }
+  .attack-limit-select:focus { border-color: var(--blue); }
+  .attack-showing-info { font-size: 11px; color: var(--text-muted); }
+
+  .attack-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .attack-table th { background: #f9fafb; padding: 10px 14px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .attack-table td { padding: 10px 14px; border-bottom: 1px solid #f9fafb; vertical-align: middle; }
+  .severity-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+  .sev-high   { background: #fdecea; color: var(--danger); }
+  .sev-medium { background: var(--warning-bg); color: var(--warning); }
+  .sev-low    { background: var(--success-bg); color: var(--success); }
+
+  .blocked-list { display: flex; flex-direction: column; gap: 8px; }
+  .blocked-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #f9fafb; border-radius: 8px; }
+  .blocked-ip   { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--navy); }
+  .blocked-info { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  .doctors-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 16px; }
+  .doctor-card  { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .doctor-img-wrap { height: 120px; background: linear-gradient(135deg,#0d2a42,#1a6eb5); position: relative; display: flex; align-items: center; justify-content: center; }
+  .doctor-avatar { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; }
+  .doctor-avatar svg { width: 32px; height: 32px; color: rgba(255,255,255,0.8); }
+  .doctor-img-badge { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.4); color: #fff; font-size: 9px; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+  .doctor-info  { padding: 16px; }
+  .doctor-name  { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .doctor-spec  { font-size: 11px; color: var(--blue); font-weight: 600; margin-top: 2px; }
+  .doctor-meta  { margin-top: 12px; }
+  .doctor-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); padding: 5px 0; border-bottom: 1px solid #f3f4f6; }
+  .doctor-meta-row strong { color: var(--navy); }
+  .doctor-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .doctor-avail { display: flex; align-items: center; gap: 8px; }
+
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .field-group   { margin-bottom: 14px; }
+  .field-label   { font-size: 11px; font-weight: 600; color: var(--navy); margin-bottom: 6px; letter-spacing: 0.2px; }
+  .field-input, .field-select {
+    width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-family: var(--font); color: var(--text); outline: none; transition: border 0.15s;
+  }
+  .field-input:focus, .field-select:focus { border-color: var(--blue); }
+  .patient-select-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 13px; font-weight: 500; }
+  .patient-select-row select { flex: 1; }
+  .download-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 10px; }
+  .dl-btn {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    background: #f9fafb; border: 1.5px solid var(--border); border-radius: 10px;
+    cursor: pointer; text-align: left; font-family: var(--font); transition: all 0.15s;
+    font-size: 12px; font-weight: 600; color: var(--navy);
+  }
+  .dl-btn:hover { border-color: var(--blue); background: var(--blue-light); }
+  .dl-icon { width: 36px; height: 36px; background: var(--blue-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .dl-icon svg { width: 18px; height: 18px; color: var(--blue); }
+  .dl-meta { font-size: 10px; color: var(--text-muted); font-weight: 400; margin-top: 2px; }
+
+  .access-denied {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px; text-align: center;
+  }
+  .access-denied-icon { width: 72px; height: 72px; border-radius: 50%; background: var(--danger-bg); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+  .access-denied-icon svg { width: 36px; height: 36px; color: var(--danger); }
+  .access-denied h2 { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+  .access-denied p  { font-size: 13px; color: var(--text-muted); max-width: 360px; margin-bottom: 20px; line-height: 1.6; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff;
+    padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 9999;
+    box-shadow: 0 8px 24px rgba(13,27,42,0.2);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .attack-popup {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(130px);
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(192,57,43,0.22), 0 6px 20px rgba(0,0,0,0.1);
+    border: 2px solid var(--danger); min-width: 390px; max-width: 500px;
+    z-index: 9998; transition: all 0.45s cubic-bezier(0.34,1.56,0.64,1);
+    opacity: 0; pointer-events: none;
+  }
+  .attack-popup.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: all; }
+  .attack-popup-header {
+    display: flex; align-items: center; gap: 14px; padding: 16px 20px;
+    background: linear-gradient(135deg, #fff1f0, #fff8f8);
+    border-radius: 14px 14px 0 0; border-bottom: 1px solid rgba(192,57,43,0.12);
+    position: relative;
+  }
+  .attack-popup-icon {
+    width: 42px; height: 42px; border-radius: 12px; background: var(--danger);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    animation: iconPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes iconPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.45); } 50% { box-shadow: 0 0 0 10px rgba(192,57,43,0); } }
+  .attack-popup-icon svg { color: #fff; }
+  .attack-popup-label { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--danger); margin-bottom: 3px; }
+  .attack-popup-title { font-size: 15px; font-weight: 700; color: var(--navy); }
+  .attack-popup-sub   { font-size: 11px; color: #e05050; margin-top: 2px; }
+  .attack-popup-close {
+    position: absolute; top: 12px; right: 14px; background: none; border: none;
+    cursor: pointer; color: var(--text-muted); padding: 4px; border-radius: 4px; transition: all 0.15s;
+  }
+  .attack-popup-close:hover { background: #f3f4f6; color: var(--danger); }
+  .attack-popup-body { padding: 16px 20px; }
+  .attack-popup-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #fafafa; }
+  .attack-popup-row:last-child { border-bottom: none; }
+  .attack-popup-key { color: var(--text-muted); font-weight: 500; }
+  .attack-popup-val { font-weight: 700; color: var(--navy); font-family: var(--mono); font-size: 11px; }
+  .attack-popup-footer { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid #f3f4f6; }
+  .popup-btn-dismiss { flex: 1; padding: 10px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font); color: var(--text-muted); transition: background 0.15s; }
+  .popup-btn-dismiss:hover { background: #e5e7eb; }
+  .popup-btn-view { flex: 1.5; padding: 10px; background: var(--navy); border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font); color: #fff; transition: background 0.15s; }
+  .popup-btn-view:hover { background: var(--navy-mid); }
+  .popup-btn-block { flex: 1.5; padding: 10px; background: var(--danger); border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font); color: #fff; transition: background 0.15s; }
+  .popup-btn-block:hover { background: #a93226; }
+  .popup-btn-block:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .notif-bell-wrap { position: relative; cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 8px; transition: background 0.15s; }
+  .notif-bell-wrap:hover { background: #f3f4f6; }
+  .notif-bell-wrap svg { width: 20px; height: 20px; color: var(--text-muted); transition: color 0.2s; }
+  .notif-bell-wrap:hover svg { color: var(--navy); }
+  .notif-bell-wrap.has-alerts svg { color: var(--danger); }
+  .notif-bell-wrap.bell-ring svg { animation: bellShake 0.6s ease-in-out; }
+  @keyframes bellShake { 0%,100%{transform:rotate(0)} 15%{transform:rotate(-18deg)} 35%{transform:rotate(18deg)} 55%{transform:rotate(-10deg)} 75%{transform:rotate(10deg)} }
+  .notif-badge { position: absolute; top: -2px; right: -2px; background: var(--danger); color: #fff; font-size: 9px; font-weight: 800; min-width: 17px; height: 17px; border-radius: 9px; display: none; align-items: center; justify-content: center; border: 2px solid #fff; padding: 0 3px; }
+  .notif-bell-wrap.has-alerts .notif-badge { display: flex; }
+
+  .clear-alert-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--success-bg); color: var(--success); border: 1.5px solid rgba(13,122,78,0.3); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font); transition: all 0.2s; }
+  .clear-alert-btn:hover { background: var(--success); color: #fff; border-color: var(--success); }
+  .clear-alert-btn.alert-active { background: var(--danger-bg); color: var(--danger); border-color: rgba(192,57,43,0.3); }
+  .clear-alert-btn.alert-active:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  @media (max-width:768px) {
+    .sidebar { transform: translateX(-100%); }
+    .main { margin-left: 0; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .sec-two-col { grid-template-columns: 1fr; }
+    .attack-popup { min-width: calc(100vw - 32px); bottom: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal-box">
+    <div class="modal-logo">
+      <div class="modal-logo-mark">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="modal-logo-text">MediCore Health</div>
+        <div class="modal-logo-sub">Clinical Intelligence Platform</div>
+      </div>
+    </div>
+    <div class="modal-title">Administrator Login</div>
+    <div class="modal-sub">Secure access to patient monitoring system</div>
+    <div class="modal-field">
+      <label>USERNAME</label>
+      <input type="text" id="login-user" placeholder="Enter admin username" autocomplete="username">
+    </div>
+    <div class="modal-field">
+      <label>PASSWORD</label>
+      <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password">
+    </div>
+    <div class="modal-error" id="login-error">Invalid username or password. Please try again.</div>
+    <button class="modal-submit" onclick="doLogin()">Sign In</button>
+    <button style="width:100%;padding:10px;background:transparent;border:none;font-size:12px;color:var(--text-muted);cursor:pointer;margin-top:8px;font-family:var(--font)" onclick="closeLoginModal()">Cancel</button>
+    <div class="modal-hint">Contact your system administrator if you need access</div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">MediCore Health</div>
+    <div class="logo-sub">Clinical Intelligence Platform</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <div class="nav-item active" onclick="showSection('home',this)">
+      <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      Overview
+    </div>
+    <div class="nav-item nav-protected" onclick="requireAuth(()=>showSection('monitoring',this))">
+      <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Monitoring
+    </div>
+    <div class="nav-item nav-protected" onclick="requireAuth(()=>showSection('security',this))">
+      <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      Security
+    </div>
+    <div class="nav-section-label nav-protected">Clinical</div>
+    <div class="nav-item nav-protected" onclick="requireAuth(()=>showSection('doctors',this))">
+      <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Doctors
+    </div>
+    <div class="nav-section-label nav-protected">System</div>
+    <div class="nav-item nav-protected" onclick="requireAuth(()=>showSection('settings',this))">
+      <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Settings
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <strong id="sb-hospital">MediCore General</strong>
+    <span id="sb-device">Device: ESP32_HEALTH_01</span>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbar-title">Overview</div>
+    <div class="topbar-right">
+      <div class="topbar-time" id="clock">--:--:--</div>
+      <div class="status-pill offline" id="device-pill">
+        <div class="status-dot"></div>
+        <span id="device-status-text">CONNECTING...</span>
+      </div>
+      <div class="notif-bell-wrap" id="notif-bell" onclick="openBellPanel()" title="Security Alerts">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <div class="notif-badge" id="notif-badge">0</div>
+      </div>
+      <button class="login-btn" id="topbar-login-btn" onclick="openLoginModal()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        Admin Login
+      </button>
+      <div class="admin-badge" id="topbar-admin-badge" style="display:none">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Admin
+      </div>
+      <button class="login-btn logout" id="topbar-logout-btn" style="display:none" onclick="doLogout()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        Logout
+      </button>
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <section class="page-section active" id="sec-home">
+    <div class="section-inner">
+      <div class="home-hero">
+        <div class="hero-tag">MediCore Health Platform — v3.0 (AWS IoT + DynamoDB)</div>
+        <h1>Intelligent Patient Health Monitoring</h1>
+        <p>Real-time biometric telemetry from ESP32 sensor nodes via MQTT → AWS IoT Core → DynamoDB → API Gateway → S3. AES-256 encryption, HMAC-SHA256 signatures, consortium blockchain.</p>
+        <div class="hero-stats">
+          <div><div class="hero-stat-val" id="home-patients">5</div><div class="hero-stat-label">Active Patients</div></div>
+          <div class="hero-divider"></div>
+          <div><div class="hero-stat-val" id="home-devices">—</div><div class="hero-stat-label">Devices Online</div></div>
+          <div class="hero-divider"></div>
+          <div><div class="hero-stat-val" id="home-blocks">—</div><div class="hero-stat-label">Blockchain Blocks</div></div>
+          <div class="hero-divider"></div>
+          <div><div class="hero-stat-val" id="home-requests">—</div><div class="hero-stat-label">DynamoDB Records</div></div>
+        </div>
+      </div>
+      <div class="home-grid">
+        <div class="info-card">
+          <div class="info-card-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+          <h3>Real-Time Monitoring</h3>
+          <p>MAX30102 (HR/SpO2) + AD8232 (ECG) sensors. ESP32 publishes MQTT every 5 s → AWS IoT Core → Lambda → DynamoDB PatientData table.</p>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon" style="background:#e8f7f1"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="color:#0d7a4e"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div>
+          <h3>Multi-Layer Security</h3>
+          <p>AES-256-CBC payload encryption, HMAC-SHA256 digital signatures, consortium blockchain integrity. All verified server-side by Lambda before DynamoDB write.</p>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon" style="background:#fef3c7"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="color:#92400e"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg></div>
+          <h3>AWS DynamoDB Storage</h3>
+          <p>PatientData table stores all ESP32 records. SecurityLogs table tracks anomalies. Both queried by Lambda at GET /dashboard and returned to this S3-hosted frontend.</p>
+        </div>
+      </div>
+      <div class="system-strip">
+        <div class="strip-item"><div class="strip-dot on"></div><div><div class="strip-label">AWS API Gateway</div><div class="strip-sub">HealthDashboardAPI — ap-south-1</div></div></div>
+        <div class="strip-item"><div class="strip-dot" id="sys-esp-dot"></div><div><div class="strip-label">ESP32_HEALTH_01</div><div class="strip-sub" id="sys-esp-sub">Waiting for data...</div></div></div>
+        <div class="strip-item"><div class="strip-dot on"></div><div><div class="strip-label">AES-256-CBC</div><div class="strip-sub">Active — MQTT payload</div></div></div>
+        <div class="strip-item"><div class="strip-dot" id="sys-chain-dot"></div><div><div class="strip-label">Blockchain Ledger</div><div class="strip-sub" id="sys-chain-sub">Checking...</div></div></div>
+      </div>
+      <div id="public-notice" style="margin-top:20px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:18px 22px;display:flex;align-items:center;gap:14px">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#1a6eb5" stroke-width="2" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1e40af">Administrator Access Required</div>
+          <div style="font-size:12px;color:#3b82f6;margin-top:3px">Patient monitoring, security logs, and clinical data are restricted to authorised administrators. Click <strong>Admin Login</strong> in the top right to sign in.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONITORING -->
+  <section class="page-section" id="sec-monitoring">
+    <div class="section-inner">
+      <div class="section-header">
+        <h1>Patient Monitoring</h1>
+        <p>Patient 1 — live data from DynamoDB via AWS API Gateway. Patients 2–5 are simulated.</p>
+      </div>
+      <div class="patient-tabs">
+        <button class="ptab active" onclick="selectPatient('Patient_1',this)">P1 — Arun Kumar</button>
+        <button class="ptab" onclick="selectPatient('Patient_2',this)">P2 — Simon Roult</button>
+        <button class="ptab" onclick="selectPatient('Patient_3',this)">P3 — Matti Morrison</button>
+        <button class="ptab" onclick="selectPatient('Patient_4',this)">P4 — Pirkko Niini</button>
+        <button class="ptab" onclick="selectPatient('Patient_5',this)">P5 — Fran Tonini</button>
+      </div>
+      <div class="patient-topbar">
+        <div class="patient-name-block">
+          <h2 id="mon-name">Arun Kumar</h2>
+          <div class="patient-meta">
+            <span>Age: <strong id="mon-age">32</strong></span>
+            <span>Ward: <strong id="mon-ward">Cardiology</strong></span>
+            <span>Admitted: <strong id="mon-admitted">2024-01-15</strong></span>
+            <span>Bed: <strong id="mon-bed">B-04</strong></span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="badge badge-info" id="mon-device-badge">ESP32_HEALTH_01</span>
+          <span class="badge badge-neutral" id="mon-status-badge">CONNECTING</span>
+        </div>
+      </div>
+      <div class="vitals-grid">
+        <div class="vital-card" id="vc-hr"><div class="vital-label">Heart Rate</div><div><span class="vital-value" id="mon-hr">--</span><span class="vital-unit">BPM</span></div><div class="vital-status" id="mon-hr-status">Fetching from DynamoDB...</div><div class="vital-range">Normal range: 60 – 100 BPM</div></div>
+        <div class="vital-card" id="vc-o2"><div class="vital-label">Oxygen Saturation</div><div><span class="vital-value" id="mon-spo2">--</span><span class="vital-unit">%</span></div><div class="vital-status" id="mon-spo2-status">Fetching from DynamoDB...</div><div class="vital-range">Normal range: 95 – 100 %</div></div>
+        <div class="vital-card" id="vc-ecg"><div class="vital-label">ECG Signal</div><div><span class="vital-value" id="mon-ecg">--</span><span class="vital-unit">ADC</span></div><div class="vital-status" id="mon-ecg-status">AD8232 Sensor</div><div class="vital-range">Raw ADC: 0 – 4095 range</div></div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-box"><div class="chart-box-title">Heart Rate — Live (DynamoDB)</div><canvas id="chart-hr"></canvas></div>
+        <div class="chart-box"><div class="chart-box-title">SpO2 — Live (DynamoDB)</div><canvas id="chart-spo2"></canvas></div>
+        <div class="chart-box"><div class="chart-box-title">ECG Signal — Live (DynamoDB)</div><canvas id="chart-ecg"></canvas></div>
+      </div>
+      <div class="card" id="patient-record-card">
+        <div class="card-header"><span class="card-title">Patient Medical Record</span><span class="badge badge-neutral" id="mon-blood-badge">A+</span></div>
+        <div class="card-body">
+          <div class="edit-bar" id="edit-bar" style="display:none">
+            <div class="edit-bar-text"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px;margin-right:5px"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg><span id="edit-bar-name">Patient 1 — Arun Kumar</span> (Editable Record)</div>
+            <div class="edit-bar-btns">
+              <button class="edit-btn edit" id="btn-edit" onclick="startEdit()">Edit Details</button>
+              <button class="edit-btn save" id="btn-save" onclick="saveEdit()">Save Changes</button>
+              <button class="edit-btn cancel" id="btn-cancel" onclick="cancelEdit()">Cancel</button>
+            </div>
+          </div>
+          <div class="detail-grid">
+            <div>
+              <div class="detail-row"><span class="detail-key">Full Name</span><span class="detail-val" id="det-name">—</span></div>
+              <div class="detail-row"><span class="detail-key">Date of Birth</span><span class="detail-val" id="det-dob">—</span></div>
+              <div class="detail-row"><span class="detail-key">Gender</span><span class="detail-val" id="det-gender">—</span></div>
+              <div class="detail-row"><span class="detail-key">Blood Group</span><span class="detail-val" id="det-blood">—</span></div>
+              <div class="detail-row"><span class="detail-key">Weight / BMI</span><span class="detail-val" id="det-weight">—</span></div>
+              <div class="detail-row"><span class="detail-key">Consulting Doctor</span><span class="detail-val" id="det-doctor">—</span></div>
+            </div>
+            <div>
+              <div class="detail-row"><span class="detail-key">Admission Date</span><span class="detail-val" id="det-admitted">—</span></div>
+              <div class="detail-row"><span class="detail-key">Ward / Bed</span><span class="detail-val" id="det-ward">—</span></div>
+              <div class="detail-row"><span class="detail-key">Purpose of Admission</span><span class="detail-val" id="det-purpose">—</span></div>
+              <div class="detail-row"><span class="detail-key">Address</span><span class="detail-val" id="det-address">—</span></div>
+              <div class="detail-row"><span class="detail-key">Mobile Number</span><span class="detail-val" id="det-mobile">—</span></div>
+              <div class="detail-row"><span class="detail-key">Emergency Contact</span><span class="detail-val" id="det-emergency">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECURITY -->
+  <section class="page-section" id="sec-security">
+    <div class="section-inner">
+      <div class="section-header flex-between">
+        <div>
+          <h1>Security Centre</h1>
+          <p>Cryptographic verification, threat detection, and blockchain audit trail</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="text-align:right;font-size:12px;color:var(--text-muted)">Device: <strong id="sec-device-name" style="color:var(--navy)">ESP32_HEALTH_01</strong></div>
+          <button class="clear-alert-btn" id="clear-alert-btn" onclick="clearSecurityAlert()">
+            <svg id="clear-btn-icon" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <span id="clear-btn-label">System Secure</span>
+          </button>
+          <button onclick="refreshSecurity()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" id="refresh-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="security-status-bar secure" id="sec-status-bar">
+        <div class="sec-bar-left">
+          <div class="sec-bar-icon">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <div>
+            <div class="sec-bar-title" id="sec-bar-title">Checking Security Status...</div>
+            <div class="sec-bar-sub" id="sec-bar-sub">Fetching from DynamoDB SecurityLogs — <span id="sec-last-check">—</span></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="badge badge-success" id="sb-aes">AES-256 Active</span>
+          <span class="badge badge-success" id="sb-hmac">HMAC-SHA256 Active</span>
+          <span class="badge badge-success" id="sb-chain">Blockchain Active</span>
+        </div>
+      </div>
+
+      <div class="sec-metrics">
+        <div class="sec-metric-card"><div class="sec-metric-label">DynamoDB Records</div><div class="sec-metric-value" id="sm-total">—</div><div class="sec-metric-sub">PatientData table</div></div>
+        <div class="sec-metric-card"><div class="sec-metric-label">Attacks Blocked</div><div class="sec-metric-value" style="color:var(--danger)" id="sm-attacks">—</div><div class="sec-metric-sub">SecurityLogs table</div></div>
+        <div class="sec-metric-card"><div class="sec-metric-label">Valid Signatures</div><div class="sec-metric-value" style="color:var(--success)" id="sm-sigs">—</div><div class="sec-metric-sub">HMAC-SHA256 verified</div></div>
+        <div class="sec-metric-card"><div class="sec-metric-label">Blockchain Blocks</div><div class="sec-metric-value" style="color:var(--success)" id="sm-blocks">—</div><div class="sec-metric-sub">Chain length (ESP32)</div></div>
+        <div class="sec-metric-card"><div class="sec-metric-label">Invalid Signatures</div><div class="sec-metric-value" style="color:var(--danger)" id="sm-inv-sigs">—</div><div class="sec-metric-sub">Possible tampering</div></div>
+        <div class="sec-metric-card"><div class="sec-metric-label">Decryption Failures</div><div class="sec-metric-value" style="color:var(--warning)" id="sm-dec-fail">—</div><div class="sec-metric-sub">AES decryption errors</div></div>
+      </div>
+
+      <div class="sec-layers">
+        <div class="sec-layer-card">
+          <div class="sec-layer-head"><h4>AES-256-CBC Encryption</h4><p>Symmetric payload encryption</p></div>
+          <div class="sec-layer-body">
+            <div class="sec-layer-row"><span class="sec-layer-key">Algorithm</span><span class="sec-layer-val">AES-256-CBC</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Key Length</span><span class="sec-layer-val">256 bit</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">IV Mode</span><span class="sec-layer-val">Random per packet</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Padding</span><span class="sec-layer-val">PKCS#7</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Status</span><span class="sec-layer-val" style="color:var(--success)">Active</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Encrypted Records</span><span class="sec-layer-val" id="sl-enc-count">—</span></div>
+          </div>
+        </div>
+        <div class="sec-layer-card">
+          <div class="sec-layer-head"><h4>HMAC-SHA256 Signature</h4><p>Digital signature verification</p></div>
+          <div class="sec-layer-body">
+            <div class="sec-layer-row"><span class="sec-layer-key">Algorithm</span><span class="sec-layer-val">HMAC-SHA256</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Key Length</span><span class="sec-layer-val">256 bit</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Comparison</span><span class="sec-layer-val">Constant-time</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Hash Input</span><span class="sec-layer-val">SHA-256(payload)</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Status</span><span class="sec-layer-val" style="color:var(--success)">Active</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Last Verified</span><span class="sec-layer-val" id="sl-last-sig">—</span></div>
+          </div>
+        </div>
+        <div class="sec-layer-card">
+          <div class="sec-layer-head"><h4>Consortium Blockchain</h4><p>Immutable audit ledger</p></div>
+          <div class="sec-layer-body">
+            <div class="sec-layer-row"><span class="sec-layer-key">Type</span><span class="sec-layer-val">Consortium</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Hash Algorithm</span><span class="sec-layer-val">SHA-256</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Block Signing</span><span class="sec-layer-val">HMAC-SHA256</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Chain Length</span><span class="sec-layer-val" id="sl-chain-len">—</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Chain Valid</span><span class="sec-layer-val" id="sl-chain-status" style="color:var(--success)">Checking...</span></div>
+            <div class="sec-layer-row"><span class="sec-layer-key">Last Update</span><span class="sec-layer-val" id="sl-last-block">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-two-col">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Attack History (SecurityLogs)</span>
+            <span class="badge badge-neutral" id="attack-count-badge">0 events</span>
+          </div>
+          <div class="attack-table-controls">
+            <div style="display:flex;align-items:center;gap:8px">
+              <label for="attack-limit-select">Show:</label>
+              <select class="attack-limit-select" id="attack-limit-select" onchange="onAttackLimitChange()">
+                <option value="10">Last 10</option>
+                <option value="20">Last 20</option>
+                <option value="50">Last 50</option>
+                <option value="100">Last 100</option>
+                <option value="0">All</option>
+              </select>
+              <span class="attack-showing-info" id="attack-showing-info"></span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted)" id="attack-total-info"></div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="attack-table">
+              <thead>
+                <tr><th>Time</th><th>Attack Type</th><th>Device ID</th><th>Patient</th><th>Reason</th><th>Severity</th><th>Status</th></tr>
+              </thead>
+              <tbody id="attack-tbody">
+                <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">Loading from DynamoDB...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Blocked Device IDs</span>
+            <span class="badge badge-danger" id="blocked-count-badge">0 blocked</span>
+          </div>
+          <div class="card-body">
+            <div class="blocked-list" id="blocked-list">
+              <div style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px 0">No blocked devices</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOCTORS -->
+  <section class="page-section" id="sec-doctors">
+    <div class="section-inner">
+      <div class="section-header"><h1>Medical Staff</h1><p>Consulting physicians and specialist doctors assigned to patient care</p></div>
+      <div class="doctors-grid">
+        <div class="doctor-card"><div class="doctor-img-wrap"><div class="doctor-avatar"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><span class="doctor-img-badge">Cardiologist</span></div><div class="doctor-info"><div class="doctor-name">Dr. Sarah Johnson</div><div class="doctor-spec">Cardiology</div><div class="doctor-meta"><div class="doctor-meta-row"><span>Experience:</span><strong>14 years</strong></div><div class="doctor-meta-row"><span>Reg. No.:</span><strong>MCI-4820</strong></div><div class="doctor-meta-row"><span>Qualification:</span><strong>MD, DM Cardiology</strong></div></div><hr class="doctor-divider"><div class="doctor-avail"><div class="strip-dot on"></div><span style="font-size:12px;color:var(--success)">Available — Mon, Wed, Fri</span></div></div></div>
+        <div class="doctor-card"><div class="doctor-img-wrap" style="background:linear-gradient(135deg,#1a3d5c,#0d2a42)"><div class="doctor-avatar"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><span class="doctor-img-badge">Neurologist</span></div><div class="doctor-info"><div class="doctor-name">Dr. Michael Chen</div><div class="doctor-spec">Neurology</div><div class="doctor-meta"><div class="doctor-meta-row"><span>Experience:</span><strong>18 years</strong></div><div class="doctor-meta-row"><span>Reg. No.:</span><strong>MCI-3317</strong></div><div class="doctor-meta-row"><span>Qualification:</span><strong>MD, DM Neurology</strong></div></div><hr class="doctor-divider"><div class="doctor-avail"><div class="strip-dot on"></div><span style="font-size:12px;color:var(--success)">Available — Tue, Thu, Sat</span></div></div></div>
+        <div class="doctor-card"><div class="doctor-img-wrap" style="background:linear-gradient(135deg,#1d3557,#457b9d)"><div class="doctor-avatar"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><span class="doctor-img-badge">Pulmonologist</span></div><div class="doctor-info"><div class="doctor-name">Dr. Emily Davis</div><div class="doctor-spec">Pulmonology</div><div class="doctor-meta"><div class="doctor-meta-row"><span>Experience:</span><strong>11 years</strong></div><div class="doctor-meta-row"><span>Reg. No.:</span><strong>MCI-5514</strong></div><div class="doctor-meta-row"><span>Qualification:</span><strong>MD, DNB Pulmonology</strong></div></div><hr class="doctor-divider"><div class="doctor-avail"><div class="strip-dot on"></div><span style="font-size:12px;color:var(--success)">Available — Mon to Fri</span></div></div></div>
+        <div class="doctor-card"><div class="doctor-img-wrap" style="background:linear-gradient(135deg,#22303f,#1a6eb5)"><div class="doctor-avatar"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><span class="doctor-img-badge">Internist</span></div><div class="doctor-info"><div class="doctor-name">Dr. James Wilson</div><div class="doctor-spec">Internal Medicine</div><div class="doctor-meta"><div class="doctor-meta-row"><span>Experience:</span><strong>22 years</strong></div><div class="doctor-meta-row"><span>Reg. No.:</span><strong>MCI-2201</strong></div><div class="doctor-meta-row"><span>Qualification:</span><strong>MD, FACP</strong></div></div><hr class="doctor-divider"><div class="doctor-avail"><div class="strip-dot warn"></div><span style="font-size:12px;color:#d97706">On Leave — Returns Tue</span></div></div></div>
+        <div class="doctor-card"><div class="doctor-img-wrap" style="background:linear-gradient(135deg,#0f2027,#2c5364)"><div class="doctor-avatar"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><span class="doctor-img-badge">Endocrinologist</span></div><div class="doctor-info"><div class="doctor-name">Dr. Lisa Anderson</div><div class="doctor-spec">Endocrinology</div><div class="doctor-meta"><div class="doctor-meta-row"><span>Experience:</span><strong>9 years</strong></div><div class="doctor-meta-row"><span>Reg. No.:</span><strong>MCI-6690</strong></div><div class="doctor-meta-row"><span>Qualification:</span><strong>MD, DM Endocrinology</strong></div></div><hr class="doctor-divider"><div class="doctor-avail"><div class="strip-dot on"></div><span style="font-size:12px;color:var(--success)">Available — Wed, Thu, Sat</span></div></div></div>
+        <div class="doctor-card"><div class="doctor-img-wrap" style="background:linear-gradient(135deg,#1a1a2e,#16213e)"><div class="doctor-avatar"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><span class="doctor-img-badge">ICU Specialist</span></div><div class="doctor-info"><div class="doctor-name">Dr. Rajesh Nair</div><div class="doctor-spec">Critical Care Medicine</div><div class="doctor-meta"><div class="doctor-meta-row"><span>Experience:</span><strong>16 years</strong></div><div class="doctor-meta-row"><span>Reg. No.:</span><strong>MCI-4105</strong></div><div class="doctor-meta-row"><span>Qualification:</span><strong>MD, EDIC, FCICM</strong></div></div><hr class="doctor-divider"><div class="doctor-avail"><div class="strip-dot on"></div><span style="font-size:12px;color:var(--success)">Available — 24/7 On-call</span></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="page-section" id="sec-settings">
+    <div class="section-inner">
+      <div class="section-header"><h1>Settings</h1><p>System configuration, device management, and data export</p></div>
+      <div class="settings-grid">
+        <div class="card"><div class="card-header"><span class="card-title">Hospital Information</span></div><div class="card-body"><div class="field-group"><div class="field-label">Hospital Name</div><input class="field-input" id="st-hospital" value="MediCore General Hospital" onchange="saveSettings()"></div><div class="field-group"><div class="field-label">Hospital ID</div><input class="field-input" id="st-hospital-id" value="MCG-001" onchange="saveSettings()"></div><div class="field-group"><div class="field-label">Department</div><input class="field-input" id="st-dept" value="Cardiology & Critical Care" onchange="saveSettings()"></div><div class="field-group"><div class="field-label">Contact Number</div><input class="field-input" id="st-contact" value="+91 44 2345 6789" onchange="saveSettings()"></div></div></div>
+        <div class="card"><div class="card-header"><span class="card-title">Device Configuration</span></div><div class="card-body"><div class="field-group"><div class="field-label">Device Name</div><input class="field-input" id="st-device-name" value="ESP32 Health Node 01" onchange="saveSettings()"></div><div class="field-group"><div class="field-label">Device ID</div><input class="field-input" id="st-device-id" value="ESP32_HEALTH_01" onchange="saveSettings()"></div><div class="field-group"><div class="field-label">AWS API Gateway URL</div><input class="field-input" id="st-server-url" value="https://ay2yihszeh.execute-api.ap-south-1.amazonaws.com/prod" onchange="saveSettings()"></div><div class="field-group"><div class="field-label">Poll Interval (seconds)</div><input class="field-input" id="st-interval" value="5" type="number" onchange="saveSettings()"></div></div></div>
+      </div>
+      <div class="card" style="margin-bottom:20px"><div class="card-header"><span class="card-title">Export Patient Records</span></div><div class="card-body"><div class="patient-select-row"><label>Select Patient:</label><select class="field-select" id="dl-patient-select"><option value="Patient_1">Patient 1 — Arun Kumar</option><option value="Patient_2">Patient 2 — Simon Roult</option><option value="Patient_3">Patient 3 — Matti Morrison</option><option value="Patient_4">Patient 4 — Pirkko Niini</option><option value="Patient_5">Patient 5 — Fran Tonini</option></select></div><div class="download-grid"><button class="dl-btn" onclick="downloadPatientPDF()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div><div>Download Patient Report — PDF<div class="dl-meta">Full medical record with vitals history</div></div></button><button class="dl-btn" onclick="downloadPatientExcel()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M6 3h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg></div><div>Download Patient Data — Excel<div class="dl-meta">Vitals history as .xlsx spreadsheet</div></div></button><button class="dl-btn" onclick="openPatientWebpage()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg></div><div>View Patient Data — Webpage<div class="dl-meta">Opens data as interactive HTML table</div></div></button></div></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Export Security Records</span></div><div class="card-body"><div class="download-grid"><button class="dl-btn" onclick="downloadSecurityExcel()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div><div>Download Security Log — Excel<div class="dl-meta">DynamoDB SecurityLogs as .xlsx</div></div></button><button class="dl-btn" onclick="openSecurityWebpage()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg></div><div>View Security Log — Webpage<div class="dl-meta">Opens attacks as interactive HTML table</div></div></button><button class="dl-btn" onclick="downloadBlockchainExcel()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></div><div>Download Blockchain — Excel<div class="dl-meta">Blockchain blocks as .xlsx</div></div></button><button class="dl-btn" onclick="openBlockchainWebpage()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg></div><div>View Blockchain — Webpage<div class="dl-meta">Opens ledger as interactive HTML table</div></div></button><button class="dl-btn" onclick="downloadSystemReport()"><div class="dl-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div><div>Download System Report — PDF<div class="dl-meta">AWS architecture + security summary</div></div></button></div></div></div>
+    </div>
+  </section>
+</main>
+
+<!-- ATTACK NOTIFICATION POPUP -->
+<div class="attack-popup" id="attack-popup">
+  <div class="attack-popup-header">
+    <div class="attack-popup-icon"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
+    <div>
+      <div class="attack-popup-label">⚠ Security Alert</div>
+      <div class="attack-popup-title">Attack Detected &amp; Blocked</div>
+      <div class="attack-popup-sub" id="popup-sub">Threat neutralised by security layer</div>
+    </div>
+    <button class="attack-popup-close" onclick="dismissAttackPopup()" title="Dismiss"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+  </div>
+  <div class="attack-popup-body">
+    <div class="attack-popup-row"><span class="attack-popup-key">Attack Type</span><span class="attack-popup-val" id="popup-type">—</span></div>
+    <div class="attack-popup-row"><span class="attack-popup-key">Device ID</span><span class="attack-popup-val" id="popup-device">—</span></div>
+    <div class="attack-popup-row"><span class="attack-popup-key">Patient</span><span class="attack-popup-val" id="popup-patient">—</span></div>
+    <div class="attack-popup-row"><span class="attack-popup-key">Severity</span><span class="attack-popup-val" id="popup-severity">—</span></div>
+    <div class="attack-popup-row"><span class="attack-popup-key">Detected At</span><span class="attack-popup-val" id="popup-time">—</span></div>
+  </div>
+  <div class="attack-popup-footer">
+    <button class="popup-btn-dismiss" onclick="dismissAttackPopup()">✕ Close</button>
+    <button class="popup-btn-block" id="popup-block-btn" onclick="blockDeviceFromPopup()">🚫 Block Device</button>
+    <button class="popup-btn-view" onclick="viewSecurityFromPopup()">View Security →</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   CREDENTIALS
+══════════════════════════════════════════════════════════════ */
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'medicore2024';
+
+/* ══════════════════════════════════════════════════════════════
+   AUTH STATE
+══════════════════════════════════════════════════════════════ */
+let isAdminLoggedIn = false;
+
+function openLoginModal() {
+  document.getElementById('login-modal').classList.add('show');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').classList.remove('show');
+  setTimeout(() => document.getElementById('login-user').focus(), 200);
+}
+function closeLoginModal() { document.getElementById('login-modal').classList.remove('show'); }
+
+function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
+    isAdminLoggedIn = true;
+    sessionStorage.setItem('medicore_admin_logged_in', '1');
+    document.body.classList.add('admin-logged-in');
+    closeLoginModal();
+    document.getElementById('topbar-login-btn').style.display  = 'none';
+    document.getElementById('topbar-admin-badge').style.display = 'flex';
+    document.getElementById('topbar-logout-btn').style.display  = 'flex';
+    document.getElementById('public-notice').style.display = 'none';
+    showToast('Welcome, Administrator! Full access granted.');
+    startAutoLogoutWatch();
+    showPendingNotifications();
+  } else {
+    document.getElementById('login-error').classList.add('show');
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-pass').focus();
+  }
+}
+
+function doLogout() {
+  isAdminLoggedIn = false;
+  sessionStorage.removeItem('medicore_admin_logged_in');
+  sessionStorage.removeItem(LAST_DATA_KEY);
+  stopAutoLogoutWatch();
+  document.body.classList.remove('admin-logged-in');
+  document.getElementById('topbar-login-btn').style.display  = 'flex';
+  document.getElementById('topbar-admin-badge').style.display = 'none';
+  document.getElementById('topbar-logout-btn').style.display  = 'none';
+  document.getElementById('public-notice').style.display = 'flex';
+  dismissAttackPopup();
+  showSection('home', document.querySelector('.nav-item'));
+  showToast('Logged out successfully.');
+}
+
+function restoreLoginState() {
+  if (sessionStorage.getItem('medicore_admin_logged_in') === '1') {
+    isAdminLoggedIn = true;
+    document.body.classList.add('admin-logged-in');
+    document.getElementById('topbar-login-btn').style.display  = 'none';
+    document.getElementById('topbar-admin-badge').style.display = 'flex';
+    document.getElementById('topbar-logout-btn').style.display  = 'flex';
+    document.getElementById('public-notice').style.display = 'none';
+    startAutoLogoutWatch();
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('login-modal').classList.contains('show')) doLogin();
+  if (e.key === 'Escape' && document.getElementById('login-modal').classList.contains('show')) closeLoginModal();
+});
+function requireAuth(fn) { if (!isAdminLoggedIn) { openLoginModal(); return; } fn(); }
+
+/* ══════════════════════════════════════════════════════════════
+   AUTO-LOGOUT
+══════════════════════════════════════════════════════════════ */
+const NO_DATA_TIMEOUT_MS = 20 * 60 * 1000;
+const LAST_DATA_KEY = 'medicore_last_real_data';
+let autoLogoutTimer = null, warnedAt1Min = false;
+
+function resetAutoLogoutTimer() { sessionStorage.setItem(LAST_DATA_KEY, String(Date.now())); warnedAt1Min = false; }
+function getLastRealDataTime() { const v = sessionStorage.getItem(LAST_DATA_KEY); return v ? parseInt(v, 10) : null; }
+
+function startAutoLogoutWatch() {
+  stopAutoLogoutWatch(); warnedAt1Min = false;
+  autoLogoutTimer = setInterval(() => {
+    if (!isAdminLoggedIn) return;
+    const last = getLastRealDataTime(); if (!last) return;
+    const elapsed = Date.now() - last, remaining = NO_DATA_TIMEOUT_MS - elapsed;
+    if (remaining <= 0) {
+      clearInterval(autoLogoutTimer); autoLogoutTimer = null;
+      const t = document.getElementById('toast');
+      t.textContent = '⚠ Session expired — no sensor data for 20 min. Logging out...';
+      t.style.background = 'var(--danger)'; t.classList.add('show');
+      setTimeout(() => { t.classList.remove('show'); t.style.background = ''; doLogout(); }, 2500);
+    } else if (remaining <= 60000 && !warnedAt1Min) {
+      warnedAt1Min = true;
+      showToast('⚠ No sensor data for 19 min — auto-logout in 1 min');
+    }
+  }, 30000);
+}
+function stopAutoLogoutWatch() { if (autoLogoutTimer) { clearInterval(autoLogoutTimer); autoLogoutTimer = null; } warnedAt1Min = false; }
+
+/* ══════════════════════════════════════════════════════════════
+   ATTACK LIMIT SELECTOR
+══════════════════════════════════════════════════════════════ */
+let attackDisplayLimit = 10;
+
+function onAttackLimitChange() {
+  const sel = document.getElementById('attack-limit-select');
+  attackDisplayLimit = parseInt(sel.value, 10);
+  updateAttackTable(_allSecurityEvents);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ATTACK NOTIFICATION SYSTEM
+══════════════════════════════════════════════════════════════ */
+let pendingAttackNotifs  = [];
+let shownAttackIds       = new Set();
+let currentAlertActive   = false;
+let alertManuallyCleared = false;
+let popupDismissTimer    = null;
+let firstPollDone        = false;
+let latestSeenAttackTs   = null;
+let frontendClearedAt    = null;   // epoch ms — when user clicked Clear Alert
+let _allSecurityEvents   = [];
+
+// ══ PERSIST clear-at timestamp across page reloads via sessionStorage ══
+const CLEARED_AT_KEY = 'medicore_cleared_at';
+
+function saveClearedAt(ts) {
+  if (ts) sessionStorage.setItem(CLEARED_AT_KEY, String(ts));
+  else sessionStorage.removeItem(CLEARED_AT_KEY);
+}
+function loadClearedAt() {
+  const v = sessionStorage.getItem(CLEARED_AT_KEY);
+  return v ? parseInt(v, 10) : null;
+}
+
+function getAttackId(ev) {
+  return `${ev.timestamp||ev.created_at||''}|${ev.event_type||ev.attack_type||''}|${ev.device_id||''}|${ev.patient_id||''}`;
+}
+function getEventTs(ev) { return ev.timestamp || ev.created_at || ''; }
+function tsMs(iso) {
+  if (!iso) return 0;
+  try {
+    const s = String(iso).trim();
+    const numeric = s.replace(/[-T:]/g, '').replace(/\..*$/, '');
+    const n = parseInt(numeric, 10);
+    return isNaN(n) ? 0 : n;
+  } catch(e) { return 0; }
+}
+function tsAfter(a, b) { return tsMs(a) > tsMs(b); }
+
+function triggerAttackPopup(ev) {
+  const type = (ev.event_type || ev.attack_type || 'Unknown Attack').replace(/_/g, ' ');
+  const tsRaw = String(ev.timestamp || '');
+  let timeDisp;
+  try {
+    const isoMatch = tsRaw.match(/T(\d{2}:\d{2}:\d{2})/);
+    timeDisp = isoMatch ? isoMatch[1] : new Date().toLocaleTimeString('en-GB');
+  } catch(e) { timeDisp = new Date().toLocaleTimeString('en-GB'); }
+  const sev = ev.severity || 'High';
+  document.getElementById('popup-type').textContent    = type;
+  document.getElementById('popup-device').textContent  = ev.device_id || '—';
+  document.getElementById('popup-patient').textContent = (ev.patient_id || '—').replace('_', ' ');
+  document.getElementById('popup-severity').textContent = sev.charAt(0).toUpperCase() + sev.slice(1).toLowerCase();
+  document.getElementById('popup-sub').textContent     = 'Blocked at ' + timeDisp + ' — Security layer active';
+  document.getElementById('popup-time').textContent    = timeDisp;
+  document.getElementById('attack-popup').dataset.deviceId = ev.device_id || '';
+  document.getElementById('attack-popup').classList.add('show');
+  if (popupDismissTimer) clearTimeout(popupDismissTimer);
+  popupDismissTimer = setTimeout(() => dismissAttackPopup(), 14000);
+  ringBell();
+}
+
+function dismissAttackPopup() {
+  document.getElementById('attack-popup').classList.remove('show');
+  if (popupDismissTimer) clearTimeout(popupDismissTimer);
+}
+
+function blockDeviceFromPopup() {
+  const popup = document.getElementById('attack-popup');
+  const deviceId = (popup.dataset.deviceId || document.getElementById('popup-device').textContent || '').trim();
+  if (!deviceId || deviceId === '—') { showToast('No device ID to block'); return; }
+  const btn = document.getElementById('popup-block-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '✓ Blocked'; }
+  const list = document.getElementById('blocked-list');
+  if (list) {
+    if (!list.querySelector(`[data-bid="${deviceId}"]`)) {
+      const placeholder = list.querySelector('[style*="No blocked"]');
+      if (placeholder) list.innerHTML = '';
+      const item = document.createElement('div');
+      item.className = 'blocked-item';
+      item.dataset.bid = deviceId;
+      item.innerHTML = `<div><div class="blocked-ip">${deviceId}</div><div class="blocked-info">Manually blocked at ${new Date().toLocaleTimeString('en-GB')}</div></div><span class="badge badge-danger">Blocked</span>`;
+      list.prepend(item);
+      const badge = document.getElementById('blocked-count-badge');
+      if (badge) {
+        const n = list.querySelectorAll('.blocked-item').length;
+        badge.textContent = n + ' blocked';
+      }
+    }
+  }
+  showToast('🚫 ' + deviceId + ' has been blocked');
+  setTimeout(() => dismissAttackPopup(), 1000);
+}
+
+function viewSecurityFromPopup() {
+  dismissAttackPopup();
+  if (!isAdminLoggedIn) { openLoginModal(); return; }
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-security').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item.nav-protected').forEach(n => { if (n.textContent.trim() === 'Security') n.classList.add('active'); });
+  document.getElementById('topbar-title').textContent = 'Security Centre';
+}
+
+function ringBell() {
+  const bell = document.getElementById('notif-bell');
+  bell.classList.add('has-alerts');
+  bell.classList.remove('bell-ring');
+  void bell.offsetWidth;
+  bell.classList.add('bell-ring');
+  setTimeout(() => bell.classList.remove('bell-ring'), 700);
+  updateBellBadge();
+}
+
+function updateBellBadge() {
+  const count = pendingAttackNotifs.length;
+  const badge = document.getElementById('notif-badge');
+  const bell  = document.getElementById('notif-bell');
+  if (count > 0) {
+    bell.classList.add('has-alerts');
+    badge.textContent = count > 9 ? '9+' : String(count);
+  } else if (!currentAlertActive) {
+    bell.classList.remove('has-alerts');
+    badge.textContent = '0';
+  }
+}
+
+function openBellPanel() {
+  if (!isAdminLoggedIn) { openLoginModal(); return; }
+  if (pendingAttackNotifs.length > 0) { triggerAttackPopup(pendingAttackNotifs[pendingAttackNotifs.length - 1]); }
+  else if (currentAlertActive) { showToast('Attack was detected — check Security Centre for details'); }
+  else { showToast('No unread security alerts'); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CLEAR SECURITY ALERT
+   FIX: saves clearedAt to sessionStorage so page reload
+        correctly shows 0 attacks in the counter.
+        Table always shows full DynamoDB history (all 150 rows).
+══════════════════════════════════════════════════════════════ */
+function clearSecurityAlert() {
+  frontendClearedAt    = Date.now();
+  saveClearedAt(frontendClearedAt);       // ← persist across reloads
+  currentAlertActive   = false;
+  alertManuallyCleared = true;
+  pendingAttackNotifs  = [];
+  latestSeenAttackTs   = new Date(frontendClearedAt).toISOString();
+
+  dismissAttackPopup();
+
+  // Bell → 0
+  const bell = document.getElementById('notif-bell');
+  bell.classList.remove('has-alerts');
+  document.getElementById('notif-badge').textContent = '0';
+
+  // Button → green / secure
+  setClearBtnState(false);
+
+  // Status bar → green
+  const bar = document.getElementById('sec-status-bar');
+  if (bar) bar.className = 'security-status-bar secure';
+  const title = document.getElementById('sec-bar-title');
+  if (title) title.textContent = 'Alert Cleared — All Systems Secure';
+  const sub = document.getElementById('sec-bar-sub');
+  if (sub) sub.textContent = 'Alert manually cleared — ' + new Date().toLocaleTimeString();
+  ['sb-aes','sb-hmac','sb-chain'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.className = 'badge badge-success';
+  });
+
+  // ── KEY FIX: Attacks Blocked counter → 0 (events since clear = 0) ──
+  const smA = document.getElementById('sm-attacks');
+  if (smA) smA.textContent = '0';
+
+  // Table still shows full history (no filtering on the table)
+  updateAttackTable(_allSecurityEvents);
+
+  showToast('✓ Alert cleared — attacks counter reset. Full history still visible in table.');
+}
+
+function setClearBtnState(alertOn) {
+  const btn   = document.getElementById('clear-alert-btn');
+  const label = document.getElementById('clear-btn-label');
+  const icon  = document.getElementById('clear-btn-icon');
+  if (!btn) return;
+  if (alertOn) {
+    btn.classList.add('alert-active');
+    if (label) label.textContent = 'Clear Alert';
+    if (icon)  icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>';
+  } else {
+    btn.classList.remove('alert-active');
+    if (label) label.textContent = 'System Secure';
+    if (icon)  icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ATTACK EVENT PROCESSING
+══════════════════════════════════════════════════════════════ */
+function processAttackEvents(events) {
+  const attackEvents = (events || []).filter(ev => {
+    const t = (ev.event_type || ev.attack_type || '').toUpperCase();
+    return t && t !== 'NORMAL';
+  });
+
+  if (!firstPollDone) {
+    firstPollDone = true;
+
+    // ── Restore cleared-at from sessionStorage on page reload ──
+    const savedClearedAt = loadClearedAt();
+    if (savedClearedAt) {
+      frontendClearedAt    = savedClearedAt;
+      alertManuallyCleared = true;
+      latestSeenAttackTs   = new Date(savedClearedAt).toISOString();
+    }
+
+    // Mark all existing events as "seen" so they don't trigger popups
+    attackEvents.forEach(ev => {
+      shownAttackIds.add(getAttackId(ev));
+      const ts = getEventTs(ev);
+      if (tsAfter(ts, latestSeenAttackTs)) latestSeenAttackTs = ts;
+    });
+
+    // Check: are there any NEW attacks after the clear time?
+    if (frontendClearedAt) {
+      const newAfterClear = attackEvents.filter(ev => tsMs(getEventTs(ev)) > frontendClearedAt);
+      if (newAfterClear.length > 0) {
+        // New attacks arrived after user cleared — re-activate alert
+        currentAlertActive   = true;
+        alertManuallyCleared = false;
+        saveClearedAt(null);
+        setClearBtnState(true);
+      }
+      // If newAfterClear is empty: keep cleared state, sm-attacks stays 0
+    } else if (attackEvents.length > 0) {
+      // First load, never cleared before
+      currentAlertActive = true;
+      setClearBtnState(true);
+    }
+    return;
+  }
+
+  // Subsequent polls — detect truly new attacks
+  const baselineTs = latestSeenAttackTs;
+  const newAttacks = attackEvents.filter(ev => {
+    const id = getAttackId(ev);
+    if (shownAttackIds.has(id)) return false;
+    shownAttackIds.add(id);
+    const evTs = getEventTs(ev);
+    if (alertManuallyCleared && frontendClearedAt) return tsMs(evTs) > frontendClearedAt;
+    return tsAfter(evTs, baselineTs);
+  });
+
+  attackEvents.forEach(ev => {
+    const ts = getEventTs(ev);
+    if (tsAfter(ts, latestSeenAttackTs)) latestSeenAttackTs = ts;
+  });
+
+  if (!newAttacks.length) return;
+
+  // New real attacks invalidate the manual clear
+  currentAlertActive   = true;
+  alertManuallyCleared = false;
+  frontendClearedAt    = null;
+  saveClearedAt(null);
+
+  setClearBtnState(true);
+
+  newAttacks.forEach(ev => {
+    if (isAdminLoggedIn) triggerAttackPopup(ev);
+    else { pendingAttackNotifs.push(ev); updateBellBadge(); ringBell(); }
+  });
+}
+
+function showPendingNotifications() {
+  const count = pendingAttackNotifs.length;
+  if (count === 0) { if (currentAlertActive) ringBell(); return; }
+  triggerAttackPopup(pendingAttackNotifs[pendingAttackNotifs.length - 1]);
+  setTimeout(() => showToast(`⚠ ${count} security attack${count>1?'s':''} occurred while logged out`), 500);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   API
+══════════════════════════════════════════════════════════════ */
+const DASHBOARD_URL = 'https://ay2yihszeh.execute-api.ap-south-1.amazonaws.com/prod/dashboard';
+
+/* ══════════════════════════════════════════════════════════════
+   PATIENT PROFILES
+══════════════════════════════════════════════════════════════ */
+const PATIENTS = {
+  Patient_1: { name:'Arun Kumar', age:32, ward:'Cardiology', bed:'B-04', admitted:'2024-01-15', device:'ESP32_HEALTH_01', dob:'1992-03-18', gender:'Male', blood:'A+', weight:'71 kg', bmi:'21.3 — Normal', doctor:'Dr. Sarah Johnson', purpose:'Cardiac arrhythmia monitoring post ablation therapy', address:'42, Nehru Street, T.Nagar, Chennai — 600017', mobile:'+91 98400 12345', emergency:'Mrs. Priya Kumar — +91 98400 99001', isRealSensor: true },
+  Patient_2: { name:'Simon Roult', age:55, ward:'Neurology', bed:'N-02', admitted:'2024-01-18', device:'ESP32_HEALTH_02', dob:'1969-07-04', gender:'Female', blood:'B+', weight:'65 kg', bmi:'22.0 — Normal', doctor:'Dr. Michael Chen', purpose:'Post-stroke rehabilitation and neurological assessment', address:'18, Victoria Road, Bangalore — 560047', mobile:'+91 80220 45678', emergency:'Mr. David Roult — +91 80220 11002', isRealSensor: false, sim:{ hr:78, spo2:97, ecg:2180 } },
+  Patient_3: { name:'Matti Morrison', age:58, ward:'Pulmonology', bed:'P-07', admitted:'2024-01-20', device:'ESP32_HEALTH_03', dob:'1966-11-22', gender:'Male', blood:'O+', weight:'71 kg', bmi:'23.1 — Normal', doctor:'Dr. Emily Davis', purpose:'Chronic obstructive pulmonary disease management', address:'7, Marine Drive, Mumbai — 400001', mobile:'+91 22910 67890', emergency:'Ms. Aino Morrison — +91 22910 33003', isRealSensor: false, sim:{ hr:84, spo2:94, ecg:1950 } },
+  Patient_4: { name:'Pirkko Niini', age:54, ward:'Endocrinology', bed:'E-11', admitted:'2024-01-22', device:'ESP32_HEALTH_04', dob:'1970-05-30', gender:'Female', blood:'AB+', weight:'55 kg', bmi:'24.2 — Normal', doctor:'Dr. James Wilson', purpose:'Diabetic ketoacidosis monitoring and insulin titration', address:'33, Park Avenue, Hyderabad — 500001', mobile:'+91 40330 23456', emergency:'Mr. Juhani Niini — +91 40330 44004', isRealSensor: false, sim:{ hr:72, spo2:98, ecg:2340 } },
+  Patient_5: { name:'Fran Tonini', age:45, ward:'ICU', bed:'I-01', admitted:'2024-01-25', device:'ESP32_HEALTH_05', dob:'1979-08-14', gender:'Male', blood:'O+', weight:'90 kg', bmi:'35.2 — Obese', doctor:'Dr. Rajesh Nair', purpose:'Acute myocardial infarction — post-PCI intensive monitoring', address:'5, MG Road, Kochi — 682001', mobile:'+91 48420 78901', emergency:'Ms. Elena Tonini — +91 48420 55005', isRealSensor: false, sim:{ hr:91, spo2:96, ecg:2710 } }
+};
+
+const P1_STORAGE_KEY = 'medicore_patient1_details';
+function savePatient1ToStorage() {
+  const p = PATIENTS['Patient_1'];
+  try { localStorage.setItem(P1_STORAGE_KEY, JSON.stringify({ name:p.name, dob:p.dob, gender:p.gender, blood:p.blood, weight:p.weight, bmi:p.bmi, doctor:p.doctor, admitted:p.admitted, ward:p.ward, bed:p.bed, purpose:p.purpose, address:p.address, mobile:p.mobile, emergency:p.emergency, age:p.age })); } catch(e) { console.warn('Storage save failed:', e); }
+}
+function loadPatient1FromStorage() {
+  try {
+    const saved = localStorage.getItem(P1_STORAGE_KEY); if (!saved) return;
+    const d = JSON.parse(saved), p = PATIENTS['Patient_1'];
+    ['name','dob','gender','blood','weight','bmi','doctor','admitted','ward','bed','purpose','address','mobile','emergency','age'].forEach(k => { if (d[k] !== undefined) p[k] = d[k]; });
+  } catch(e) { console.warn('Storage load failed:', e); }
+}
+
+const EDITABLE_FIELDS = ['det-name','det-dob','det-gender','det-blood','det-weight','det-doctor','det-admitted','det-ward','det-purpose','det-address','det-mobile','det-emergency'];
+let editBackup = {}, editMode = false;
+
+function startEdit() {
+  editMode = true; editBackup = {};
+  EDITABLE_FIELDS.forEach(id => {
+    const el = document.getElementById(id), val = el.textContent;
+    editBackup[id] = val;
+    el.innerHTML = `<input class="edit-input" value="${val.replace(/"/g,'&quot;')}" data-field="${id}">`;
+  });
+  document.getElementById('btn-edit').style.display = 'none';
+  document.getElementById('btn-save').style.display = 'inline-flex';
+  document.getElementById('btn-cancel').style.display = 'inline-flex';
+  document.querySelector('[data-field="det-name"]').focus();
+}
+function saveEdit() {
+  EDITABLE_FIELDS.forEach(id => {
+    const input = document.querySelector(`[data-field="${id}"]`);
+    if (input) {
+      const v = input.value; document.getElementById(id).textContent = v;
+      const p = PATIENTS['Patient_1'];
+      if (id==='det-name') p.name=v; else if (id==='det-dob') p.dob=v; else if (id==='det-gender') p.gender=v; else if (id==='det-blood') p.blood=v; else if (id==='det-weight') { p.weight=v; p.bmi=''; } else if (id==='det-doctor') p.doctor=v; else if (id==='det-admitted') p.admitted=v; else if (id==='det-ward') { p.ward=v; p.bed=''; } else if (id==='det-purpose') p.purpose=v; else if (id==='det-address') p.address=v; else if (id==='det-mobile') p.mobile=v; else if (id==='det-emergency') p.emergency=v;
+    }
+  });
+  savePatient1ToStorage();
+  const p = PATIENTS['Patient_1'];
+  document.getElementById('mon-name').textContent = p.name;
+  document.getElementById('mon-blood-badge').textContent = p.blood;
+  document.getElementById('mon-age').textContent = p.age;
+  const ebn = document.getElementById('edit-bar-name'); if (ebn) ebn.textContent = 'Patient 1 — ' + p.name;
+  const ft = document.querySelector('.ptab'); if (ft) ft.textContent = 'P1 — ' + p.name;
+  exitEditMode();
+  showToast('✓ Patient record saved.');
+}
+function cancelEdit() { EDITABLE_FIELDS.forEach(id => { document.getElementById(id).textContent = editBackup[id] || '—'; }); exitEditMode(); showToast('Edit cancelled.'); }
+function exitEditMode() { editMode = false; document.getElementById('btn-edit').style.display = 'inline-flex'; document.getElementById('btn-save').style.display = 'none'; document.getElementById('btn-cancel').style.display = 'none'; }
+
+/* ══════════════════════════════════════════════════════════════
+   SIMULATED VITALS
+══════════════════════════════════════════════════════════════ */
+const simState = {};
+Object.entries(PATIENTS).forEach(([pid, p]) => { if (!p.isRealSensor) simState[pid] = { hr:p.sim.hr, spo2:p.sim.spo2, ecg:p.sim.ecg, history:{heart_rate:[],spo2:[],ecg:[],timestamps:[]} }; });
+function clamp(v,mn,mx){ return Math.min(mx,Math.max(mn,v)); }
+function fluctuate(pid) {
+  const s=simState[pid], p=PATIENTS[pid]; if(!s) return;
+  s.hr=clamp(s.hr+(Math.random()-0.5)*4,p.sim.hr-12,p.sim.hr+12);
+  s.spo2=clamp(s.spo2+(Math.random()-0.5)*0.6,Math.max(90,p.sim.spo2-3),100);
+  s.ecg=clamp(s.ecg+(Math.random()-0.5)*100,p.sim.ecg-400,p.sim.ecg+400);
+  s.hr=Math.round(s.hr); s.spo2=parseFloat(s.spo2.toFixed(1)); s.ecg=Math.round(s.ecg);
+  const ts=new Date().toLocaleTimeString('en-GB'), MAX=20;
+  if(s.history.timestamps.length>=MAX){s.history.timestamps.shift();s.history.heart_rate.shift();s.history.spo2.shift();s.history.ecg.shift();}
+  s.history.timestamps.push(ts);s.history.heart_rate.push(s.hr);s.history.spo2.push(s.spo2);s.history.ecg.push(s.ecg);
+}
+setInterval(()=>{Object.keys(simState).forEach(pid=>{ if(pid==='Patient_1') return; fluctuate(pid);if(currentPatient===pid)renderSimVitals(pid);});},3000);
+
+/* ══════════════════════════════════════════════════════════════
+   CHARTS
+══════════════════════════════════════════════════════════════ */
+function makeChart(id,label,color){ return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{labels:[],datasets:[{label,data:[],borderColor:color,backgroundColor:color+'18',borderWidth:2,pointRadius:2,tension:0.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:6,font:{size:9}},grid:{color:'#f3f4f6'}},y:{ticks:{font:{size:9}},grid:{color:'#f3f4f6'}}}}}); }
+const chartHR=makeChart('chart-hr','Heart Rate','#1a6eb5');
+const chartSpo2=makeChart('chart-spo2','SpO2','#0d7a4e');
+const chartECG=makeChart('chart-ecg','ECG','#92400e');
+function updateCharts(hist){ const ts=(hist.timestamps||[]).slice(-20); if(!ts.length) return; chartHR.data.labels=ts;chartHR.data.datasets[0].data=(hist.heart_rate||[]).slice(-20);chartHR.update('none'); chartSpo2.data.labels=ts;chartSpo2.data.datasets[0].data=(hist.spo2||[]).slice(-20);chartSpo2.update('none'); chartECG.data.labels=ts;chartECG.data.datasets[0].data=(hist.ecg||[]).slice(-20);chartECG.update('none'); }
+function clearCharts(){ [chartHR,chartSpo2,chartECG].forEach(c=>{c.data.labels=[];c.data.datasets[0].data=[];c.update('none');}); }
+
+/* ══════════════════════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════════════════════ */
+const sectionTitles={home:'Overview',monitoring:'Patient Monitoring',security:'Security Centre',doctors:'Medical Staff',settings:'Settings'};
+function showSection(id,el){
+  document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  document.getElementById('topbar-title').textContent=sectionTitles[id]||id;
+}
+
+let currentPatient = 'Patient_1';
+function selectPatient(pid, el) {
+  if (editMode) cancelEdit();
+  currentPatient = pid;
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active')); el.classList.add('active');
+  const p = PATIENTS[pid];
+  document.getElementById('mon-name').textContent=p.name; document.getElementById('mon-age').textContent=p.age; document.getElementById('mon-ward').textContent=p.ward; document.getElementById('mon-admitted').textContent=p.admitted; document.getElementById('mon-bed').textContent=p.bed; document.getElementById('mon-device-badge').textContent=p.device; document.getElementById('mon-blood-badge').textContent=p.blood;
+  document.getElementById('det-name').textContent=p.name; document.getElementById('det-dob').textContent=p.dob; document.getElementById('det-gender').textContent=p.gender; document.getElementById('det-blood').textContent=p.blood; document.getElementById('det-weight').textContent=p.bmi?p.weight+' / BMI '+p.bmi:p.weight; document.getElementById('det-doctor').textContent=p.doctor; document.getElementById('det-admitted').textContent=p.admitted; document.getElementById('det-ward').textContent=p.bed?p.ward+' — Bed '+p.bed:p.ward; document.getElementById('det-purpose').textContent=p.purpose; document.getElementById('det-address').textContent=p.address; document.getElementById('det-mobile').textContent=p.mobile; document.getElementById('det-emergency').textContent=p.emergency;
+  document.getElementById('edit-bar').style.display = (pid==='Patient_1') ? 'flex' : 'none';
+  if (pid==='Patient_1') { const ebn=document.getElementById('edit-bar-name'); if(ebn) ebn.textContent='Patient 1 — '+p.name; }
+  clearCharts();
+  ['mon-hr','mon-spo2','mon-ecg'].forEach(id=>document.getElementById(id).textContent='--');
+  if (p.isRealSensor) { setStatusPill('connecting'); document.getElementById('mon-status-badge').textContent='CONNECTING'; document.getElementById('mon-status-badge').className='badge badge-neutral'; if(_lastData) applyToMonitoring(_lastData); }
+  else renderSimVitals(pid);
+}
+
+function setStatusPill(state){ const pill=document.getElementById('device-pill'),text=document.getElementById('device-status-text'); pill.className='status-pill '+state; if(state==='online')text.textContent='ONLINE'; else if(state==='offline')text.textContent='OFFLINE'; else if(state==='simulated')text.textContent='SIMULATED'; else text.textContent='CONNECTING...'; }
+function renderSimVitals(pid){ const s=simState[pid]; if(!s) return; setStatusPill('simulated'); const mb=document.getElementById('mon-status-badge'); mb.textContent='SIMULATED';mb.className='badge badge-warning'; document.getElementById('mon-hr').textContent=s.hr; document.getElementById('vc-hr').className='vital-card'+(s.hr>=60&&s.hr<=100?' success':' danger'); document.getElementById('mon-hr-status').textContent=s.hr<60?'Bradycardia':s.hr>100?'Tachycardia':'Normal Sinus Rhythm'; document.getElementById('mon-spo2').textContent=s.spo2; document.getElementById('vc-o2').className='vital-card'+(s.spo2<90?' danger':s.spo2>=95?' success':''); document.getElementById('mon-spo2-status').textContent=s.spo2<90?'Hypoxia — Critical':s.spo2<95?'Low — Monitor closely':'Normal'; document.getElementById('mon-ecg').textContent=s.ecg; document.getElementById('mon-ecg-status').textContent='Signal active (simulated)'; updateCharts(s.history); }
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD FETCH
+══════════════════════════════════════════════════════════════ */
+let _lastData=null, _failCount=0;
+async function fetchDashboard(){
+  try{
+    const res=await fetch(DASHBOARD_URL,{cache:'no-store'});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    _lastData=data; _failCount=0;
+    _allSecurityEvents = (data.security_events || []).slice();
+    applyDashboardData(data);
+  }catch(e){
+    _failCount++;
+    if(_failCount>=3){ setStatusPill('offline'); const dot=document.getElementById('sys-esp-dot');if(dot)dot.className='strip-dot off'; const sub=document.getElementById('sys-esp-sub');if(sub)sub.textContent='API unreachable'; if(currentPatient==='Patient_1'){const mb=document.getElementById('mon-status-badge');if(mb){mb.textContent='OFFLINE';mb.className='badge badge-danger';}} }
+  }
+}
+
+function applyDashboardData(d){
+  try{
+    const online=(d.device_status||'').toUpperCase()==='ONLINE'; setStatusPill(online?'online':'offline');
+    const g=id=>document.getElementById(id);
+    if(g('sys-esp-dot'))g('sys-esp-dot').className='strip-dot '+(online?'on':'off');
+    if(g('sys-esp-sub'))g('sys-esp-sub').textContent=online?'Connected — last: '+((d.last_update||'').match(/T(\d{2}:\d{2}:\d{2})/)||['','?'])[1]:'No recent data from ESP32';
+    if(g('sys-chain-dot'))g('sys-chain-dot').className=d.chain_valid?'strip-dot on':'strip-dot warn';
+    if(g('sys-chain-sub'))g('sys-chain-sub').textContent=(d.chain_length||0)+' blocks — '+(d.chain_valid?'Valid':'Check needed');
+    if(g('home-devices'))g('home-devices').textContent=online?'1':'0';
+    if(g('home-blocks'))g('home-blocks').textContent=d.chain_length??'—';
+    if(g('home-requests'))g('home-requests').textContent=d.total_records??'—';
+  }catch(err){console.warn('[layout]',err.message);}
+  try{applyToMonitoring(d);}catch(err){console.warn('[monitoring]',err.message);}
+  try{applyToSecurity(d);}catch(err){console.warn('[security]',err.message);}
+}
+
+let _previousOnlineState = null;
+
+function applyToMonitoring(d){
+  if(currentPatient!=='Patient_1') return;
+  const online=(d.device_status||'').toUpperCase()==='ONLINE';
+  const mb=document.getElementById('mon-status-badge');
+  if(mb){mb.textContent=online?'ONLINE':'OFFLINE';mb.className='badge '+(online?'badge-success':'badge-danger');}
+  if (online && isAdminLoggedIn) resetAutoLogoutTimer();
+  if(!online) {
+    document.getElementById('mon-hr').textContent = '--';
+    document.getElementById('mon-spo2').textContent = '--';
+    document.getElementById('mon-ecg').textContent = '--';
+    document.getElementById('vc-hr').className = 'vital-card';
+    document.getElementById('vc-o2').className = 'vital-card';
+    document.getElementById('vc-ecg').className = 'vital-card';
+    document.getElementById('mon-hr-status').textContent = 'Device Offline';
+    document.getElementById('mon-spo2-status').textContent = 'Device Offline';
+    document.getElementById('mon-ecg-status').textContent = 'Device Offline';
+    clearCharts();
+    _previousOnlineState = false;
+    return;
+  }
+  if(_previousOnlineState === false) {
+    document.getElementById('mon-hr').textContent = '--';
+    document.getElementById('mon-spo2').textContent = '--';
+    document.getElementById('mon-ecg').textContent = '--';
+    document.getElementById('mon-hr-status').textContent = 'Reconnecting — waiting for fresh data...';
+    document.getElementById('mon-spo2-status').textContent = 'Reconnecting — waiting for fresh data...';
+    document.getElementById('mon-ecg-status').textContent = 'Reconnecting — waiting for fresh data...';
+    clearCharts();
+    _previousOnlineState = true;
+    return;
+  }
+  _previousOnlineState = true;
+  const hr=d.heart_rate||0,spo2=d.spo2||0,ecg=d.ecg_value||0;
+  const monHr=document.getElementById('mon-hr');
+  if(monHr) monHr.textContent = hr>0 ? hr : '--';
+  const vcHr=document.getElementById('vc-hr');
+  if(vcHr) vcHr.className='vital-card'+(hr>0&&hr>=60&&hr<=100?' success':hr>0?' danger':'');
+  const hrStatus=document.getElementById('mon-hr-status');
+  if(hrStatus) hrStatus.textContent=hr>0?(hr<60?'Bradycardia':hr>100?'Tachycardia':'Normal Sinus Rhythm'):'Sensor warming up...';
+  const monSpo2=document.getElementById('mon-spo2');
+  if(monSpo2) monSpo2.textContent = spo2>0 ? spo2 : '--';
+  const vcO2=document.getElementById('vc-o2');
+  if(vcO2) vcO2.className='vital-card'+(spo2>0&&spo2<90?' danger':spo2>=95?' success':'');
+  const spo2Status=document.getElementById('mon-spo2-status');
+  if(spo2Status) spo2Status.textContent=spo2>0?(spo2<90?'Hypoxia — Critical':spo2<95?'Low — Monitor closely':'Normal'):'Sensor warming up...';
+  const monEcg=document.getElementById('mon-ecg');
+  if(monEcg) monEcg.textContent = ecg>0 ? ecg : '--';
+  const ecgStatus=document.getElementById('mon-ecg-status');
+  if(ecgStatus) ecgStatus.textContent=ecg>0?'Signal active (AD8232)':'Sensor initialising';
+  const sbDev=document.getElementById('sb-device');if(sbDev)sbDev.textContent='Device: '+(d.device_id||'ESP32_HEALTH_01');
+  const secDev=document.getElementById('sec-device-name');if(secDev)secDev.textContent=d.device_id||'ESP32_HEALTH_01';
+  const hist=d.history||{};
+  if((hist.timestamps||[]).length>0) updateCharts(hist);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   APPLY TO SECURITY
+   FIX: "Attacks Blocked" counter correctly stays 0 after clear,
+        even after page refresh, by reading frontendClearedAt
+        which is restored from sessionStorage before this runs.
+══════════════════════════════════════════════════════════════ */
+function applyToSecurity(d){
+  const ss=d.security_stats||{};
+  const g=id=>document.getElementById(id);
+
+  // processAttackEvents sets alertManuallyCleared + frontendClearedAt on first poll
+  processAttackEvents(d.security_events||[]);
+
+  const allEvents = _allSecurityEvents;
+  updateAttackTable(allEvents);
+
+  // ── FIXED counter: count only events AFTER the cleared timestamp ──
+  let attacksBlockedCount;
+  if (alertManuallyCleared && frontendClearedAt) {
+    // User cleared — count only new events since the clear
+    attacksBlockedCount = allEvents.filter(ev => tsMs(getEventTs(ev)) > frontendClearedAt).length;
+  } else {
+    // Normal state — show total
+    attacksBlockedCount = allEvents.length;
+  }
+
+  if(g('sm-total'))   g('sm-total').textContent=ss.total_requests??d.total_records??'—';
+  if(g('sm-attacks')) g('sm-attacks').textContent = attacksBlockedCount;
+  if(g('sm-sigs'))    g('sm-sigs').textContent=ss.valid_signatures??'—';
+  if(g('sm-blocks'))  g('sm-blocks').textContent=ss.valid_blocks??d.chain_length??'—';
+  if(g('sm-inv-sigs'))g('sm-inv-sigs').textContent=ss.invalid_signatures??'0';
+  if(g('sm-dec-fail'))g('sm-dec-fail').textContent=ss.decryption_failures??'0';
+  if(g('sl-enc-count'))g('sl-enc-count').textContent=ss.encrypted_requests??'—';
+  if(g('sl-chain-len'))g('sl-chain-len').textContent=(d.chain_length||0)+' blocks';
+  if(g('sl-chain-status')){g('sl-chain-status').textContent=d.chain_valid?'Intact ✓':'Check needed';g('sl-chain-status').style.color=d.chain_valid?'var(--success)':'var(--warning)';}
+  if(g('sl-last-block'))g('sl-last-block').textContent=(d.last_update||'—').substring(0,19);
+  if(g('sl-last-sig'))  g('sl-last-sig').textContent=(d.last_update||'—').substring(11,19);
+
+  // Status bar — only update if not manually cleared
+  if (!alertManuallyCleared) {
+    const hasNew = currentAlertActive;
+    const bar=g('sec-status-bar'); if(bar) bar.className='security-status-bar '+(hasNew?'attack':'secure');
+    if(g('sec-bar-title'))g('sec-bar-title').textContent=hasNew?'🚨 Security Alert — Attack Detected':'All Systems Secure';
+    if(g('sec-bar-sub'))  g('sec-bar-sub').textContent=hasNew?`${allEvents.length} threat(s) in log`:'No threats detected';
+    if(g('sb-aes'))  g('sb-aes').className='badge '+(hasNew?'badge-danger':'badge-success');
+    if(g('sb-hmac')) g('sb-hmac').className='badge '+(hasNew?'badge-danger':'badge-success');
+    setClearBtnState(hasNew);
+  }
+
+  if(g('sec-last-check'))g('sec-last-check').textContent=new Date().toLocaleTimeString();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ATTACK TABLE
+══════════════════════════════════════════════════════════════ */
+const SEV_MAP={'ATTACK_MODE_ACTIVE':['High','sev-high'],'SPOOFED_DATA_FLAG':['High','sev-high'],'IMPOSSIBLE_HEART_RATE':['High','sev-high'],'SIGNATURE_TAMPERING':['High','sev-high'],'BLOCK_INVALID':['High','sev-high'],'REPLAY_ATTACK':['High','sev-high'],'DECRYPTION_FAILED':['High','sev-high'],'ARP_SPOOF':['High','sev-high'],'DATA_INJECTION':['High','sev-high'],'DDOS_FLOOD':['High','sev-high'],'RAPID_VALUE_CHANGE':['Medium','sev-medium'],'INVALID_SPO2':['Medium','sev-medium'],'INVALID_ECG':['Low','sev-low']};
+
+function updateAttackTable(events) {
+  const tbody  = document.getElementById('attack-tbody');
+  const total  = events.length;
+  const limit  = attackDisplayLimit;
+  const sorted = [...events].sort((a,b) => tsMs(getEventTs(b)) - tsMs(getEventTs(a)));
+  const slice  = limit > 0 ? sorted.slice(0, limit) : sorted;
+
+  document.getElementById('attack-count-badge').textContent = total + ' event' + (total !== 1 ? 's' : '');
+
+  const showingInfo = document.getElementById('attack-showing-info');
+  if (showingInfo) showingInfo.textContent = total > 0 ? `Showing ${slice.length} of ${total}` : '';
+  const totalInfo = document.getElementById('attack-total-info');
+  if (totalInfo) totalInfo.textContent = total > 0 ? `${total} total event${total!==1?'s':''} in log` : '';
+
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">No attack events to display</td></tr>';
+    document.getElementById('blocked-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px 0">No blocked devices</div>';
+    document.getElementById('blocked-count-badge').textContent = '0 blocked';
+    return;
+  }
+
+  const blocked = new Set();
+  tbody.innerHTML = slice.map(ev => {
+    const type=ev.event_type||ev.attack_type||'—', deviceId=ev.device_id||'—', patient=ev.patient_id||'—', reason=ev.reason||'—', status=ev.status||'Blocked', severity=ev.severity||null;
+    let sevLabel, sevClass;
+    if (severity) { sevLabel = severity.charAt(0).toUpperCase()+severity.slice(1).toLowerCase(); sevClass = severity.toUpperCase()==='HIGH'?'sev-high':severity.toUpperCase()==='MEDIUM'?'sev-medium':'sev-low'; }
+    else { [sevLabel,sevClass]=SEV_MAP[type]||['Low','sev-low']; }
+    const tsRaw=String(ev.timestamp||'—');
+    const _timeMatch = tsRaw.match(/T(\d{2}:\d{2}:\d{2})/);
+    const timeDisplay = _timeMatch ? _timeMatch[1] : (tsRaw.length > 10 ? tsRaw.substring(11,19) : tsRaw);
+    const dateDisplay = tsRaw.length >= 10 ? tsRaw.substring(0,10) : '';
+    if (deviceId!=='—') blocked.add(deviceId);
+    const statusBadge = status.toLowerCase()==='blocked'?'<span class="badge badge-danger">Blocked</span>':`<span class="badge badge-neutral">${status}</span>`;
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)"><div style="font-weight:600">${timeDisplay}</div><div style="font-size:9px;color:#9ca3af">${dateDisplay}</div></td>
+      <td style="font-weight:700;color:var(--navy);font-size:11px">${type.replace(/_/g,' ')}</td>
+      <td><span style="font-family:var(--mono);font-size:11px;color:#1a6eb5;background:#e8f2fb;padding:2px 6px;border-radius:4px">${deviceId}</span></td>
+      <td style="font-size:11px;color:var(--text-muted)">${patient.replace('_',' ')}</td>
+      <td style="font-size:11px;color:var(--text-muted);max-width:200px;word-break:break-word">${reason}</td>
+      <td><span class="severity-chip ${sevClass}">${sevLabel}</span></td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  }).join('');
+
+  const ba = [...blocked];
+  document.getElementById('blocked-count-badge').textContent = ba.length + ' blocked';
+  document.getElementById('blocked-list').innerHTML = ba.length
+    ? ba.map(id=>`<div class="blocked-item"><div><div class="blocked-ip">${id}</div><div class="blocked-info">Blocked due to security violation</div></div><span class="badge badge-danger">Blocked</span></div>`).join('')
+    : '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px 0">No blocked devices</div>';
+}
+
+async function refreshSecurity(){
+  const icon=document.getElementById('refresh-icon');
+  icon.style.transition='transform 0.6s'; icon.style.transform='rotate(360deg)';
+  setTimeout(()=>{icon.style.transition='none';icon.style.transform='rotate(0deg)';},700);
+  document.getElementById('attack-tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">Refreshing from DynamoDB...</td></tr>';
+  document.getElementById('attack-count-badge').textContent='loading...';
+  await fetchDashboard();
+  showToast('Security data refreshed');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CLOCK + SETTINGS
+══════════════════════════════════════════════════════════════ */
+function updateClock(){ document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-GB'); }
+function saveSettings(){ document.getElementById('sb-hospital').textContent=document.getElementById('st-hospital').value; showToast('Settings saved'); }
+
+/* ══════════════════════════════════════════════════════════════
+   EXCEL HELPER
+══════════════════════════════════════════════════════════════ */
+function buildXlsx(sheetName, headers, rows) {
+  const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:x="urn:schemas-microsoft-com:office:excel">
+ <Styles>
+  <Style ss:ID="h"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0D1B2A" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="even"><Interior ss:Color="#F0F4F8" ss:Pattern="Solid"/></Style>
+ </Styles>
+ <Worksheet ss:Name="${esc(sheetName)}">
+  <Table>`;
+  xml += '\n   <Row>';
+  headers.forEach(h => { xml += `<Cell ss:StyleID="h"><Data ss:Type="String">${esc(h)}</Data></Cell>`; });
+  xml += '</Row>';
+  rows.forEach((row, ri) => {
+    const style = ri%2===1 ? ' ss:StyleID="even"' : '';
+    xml += `\n   <Row${style}>`;
+    row.forEach(cell => {
+      const v = cell ?? '';
+      const isNum = v !== '' && !isNaN(Number(v));
+      xml += `<Cell><Data ss:Type="${isNum?'Number':'String'}">${esc(v)}</Data></Cell>`;
+    });
+    xml += '</Row>';
+  });
+  xml += '\n  </Table>\n </Worksheet>\n</Workbook>';
+  return xml;
+}
+function triggerXlsxDownload(xlsxXml, filename) {
+  const blob = new Blob([xlsxXml], {type:'application/vnd.ms-excel;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   WEBPAGE HELPER
+══════════════════════════════════════════════════════════════ */
+/* ── Blob-URL helper: never blocked by popup blockers ── */
+function openHtmlInNewTab(htmlString) {
+  const blob = new Blob([htmlString], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.target   = '_blank';
+  a.rel      = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Revoke after a short delay so the new tab has time to load
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function openTableWebpage(title, subtitle, headers, rows) {
+  const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const thead = '<tr>' + headers.map(h=>`<th>${esc(h)}</th>`).join('') + '</tr>';
+  const tbody = rows.map((r,i)=>`<tr class="${i%2===0?'even':''}">${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#f0f4f8;color:#0d1b2a;padding:32px;font-size:13px}
+h1{font-size:22px;font-weight:700;color:#0d1b2a;margin-bottom:4px}
+.sub{font-size:11px;color:#6b7280;margin-bottom:24px}
+.table-wrap{background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;box-shadow:0 2px 8px rgba(13,27,42,0.07)}
+table{width:100%;border-collapse:collapse}
+th{background:#0d1b2a;color:#fff;padding:10px 14px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap}
+td{padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:12px;vertical-align:top;word-break:break-word;max-width:260px}
+tr.even td{background:#f8fafc}
+tr:hover td{background:#e8f2fb}
+.footer{margin-top:16px;font-size:10px;color:#9ca3af}
+</style></head><body>
+<h1>${esc(title)}</h1>
+<div class="sub">${esc(subtitle)}</div>
+<div class="table-wrap"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>
+<div class="footer">MediCore Health Platform &mdash; Generated: ${new Date().toLocaleString()} &mdash; ${rows.length} record${rows.length!==1?'s':''}</div>
+</body></html>`;
+  openHtmlInNewTab(html);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PATIENT DATA HELPERS
+══════════════════════════════════════════════════════════════ */
+function _getPatientRows(pid) {
+  const p = PATIENTS[pid];
+  const headers = ['Timestamp','Heart Rate (BPM)','SpO2 (%)','ECG (ADC)','Source'];
+  let rows = [];
+  if (p.isRealSensor && _lastData) {
+    const hist = _lastData.history || {};
+    (hist.timestamps||[]).forEach((ts,i) => {
+      rows.push([ts, hist.heart_rate[i]??'', hist.spo2[i]??'', hist.ecg[i]??'', 'DynamoDB (Live)']);
+    });
+    if (!rows.length) rows.push([(_lastData.last_update||new Date().toISOString()), _lastData.heart_rate||'', _lastData.spo2||'', _lastData.ecg_value||'', 'DynamoDB (Latest)']);
+  } else {
+    const s = simState[pid] || {};
+    (s.history?.timestamps||[]).forEach((ts,i) => {
+      rows.push([ts, s.history.heart_rate[i]??'', s.history.spo2[i]??'', s.history.ecg[i]??'', 'Simulated']);
+    });
+    if (!rows.length) rows.push([new Date().toISOString(), s.hr||'', s.spo2||'', s.ecg||'', 'Simulated']);
+  }
+  return { p, headers, rows };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PATIENT PDF — FIX: was missing, now implemented
+══════════════════════════════════════════════════════════════ */
+function downloadPatientPDF() {
+  const pid = document.getElementById('dl-patient-select').value;
+  const p = PATIENTS[pid];
+  const { rows } = _getPatientRows(pid);
+  const vitalsRows = rows.slice(0, 20).map((r, i) =>
+    `<tr class="${i%2===0?'even':''}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`
+  ).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Patient Report — ${p.name}</title>
+<style>
+  @page { margin: 20mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #0d1b2a; font-size: 12px; }
+  .header { background: #0d1b2a; color: #fff; padding: 20px 24px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .header .sub { font-size: 10px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; text-transform: uppercase; }
+  .header .date { font-size: 11px; color: rgba(255,255,255,0.6); text-align: right; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; background: #e8f7f1; color: #0d7a4e; margin-left: 8px; }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #6b7280; margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid #e5e7eb; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; margin-bottom: 16px; }
+  .info-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f3f4f6; }
+  .info-key { font-size: 11px; color: #6b7280; }
+  .info-val { font-size: 11px; font-weight: 600; color: #0d1b2a; text-align: right; max-width: 200px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #0d1b2a; color: #fff; padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; }
+  tr.even td { background: #f8fafc; }
+  .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; }
+  .vitals-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .vital-box { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; }
+  .vital-box-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; margin-bottom: 4px; }
+  .vital-box-val { font-size: 22px; font-weight: 700; font-family: monospace; color: #0d1b2a; }
+  .vital-box-unit { font-size: 11px; color: #6b7280; margin-left: 3px; }
+</style>
+</head><body>
+<div class="header">
+  <div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">MediCore Health Platform — Patient Report</div>
+    <h1>${p.name} <span class="badge">${p.blood}</span></h1>
+    <div class="sub">Patient ID: ${pid} &nbsp;|&nbsp; ${p.ward} &nbsp;|&nbsp; Bed ${p.bed} &nbsp;|&nbsp; Dr. ${p.doctor}</div>
+  </div>
+  <div class="date">Generated:<br>${new Date().toLocaleString('en-GB')}<br><br>MediCore General<br>Hospital ID: MCG-001</div>
+</div>
+
+<div class="section-title">Patient Demographics</div>
+<div class="info-grid">
+  <div>
+    <div class="info-row"><span class="info-key">Full Name</span><span class="info-val">${p.name}</span></div>
+    <div class="info-row"><span class="info-key">Date of Birth</span><span class="info-val">${p.dob}</span></div>
+    <div class="info-row"><span class="info-key">Gender</span><span class="info-val">${p.gender}</span></div>
+    <div class="info-row"><span class="info-key">Blood Group</span><span class="info-val">${p.blood}</span></div>
+    <div class="info-row"><span class="info-key">Weight / BMI</span><span class="info-val">${p.weight}${p.bmi?' / BMI '+p.bmi:''}</span></div>
+    <div class="info-row"><span class="info-key">Mobile</span><span class="info-val">${p.mobile}</span></div>
+  </div>
+  <div>
+    <div class="info-row"><span class="info-key">Admission Date</span><span class="info-val">${p.admitted}</span></div>
+    <div class="info-row"><span class="info-key">Ward / Bed</span><span class="info-val">${p.ward} — Bed ${p.bed}</span></div>
+    <div class="info-row"><span class="info-key">Consulting Doctor</span><span class="info-val">${p.doctor}</span></div>
+    <div class="info-row"><span class="info-key">Purpose of Admission</span><span class="info-val">${p.purpose}</span></div>
+    <div class="info-row"><span class="info-key">Address</span><span class="info-val">${p.address}</span></div>
+    <div class="info-row"><span class="info-key">Emergency Contact</span><span class="info-val">${p.emergency}</span></div>
+  </div>
+</div>
+
+<div class="section-title">Latest Vitals</div>
+<div class="vitals-summary">
+  <div class="vital-box">
+    <div class="vital-box-label">Heart Rate</div>
+    <div><span class="vital-box-val">${rows[0]?rows[0][1]:'--'}</span><span class="vital-box-unit">BPM</span></div>
+  </div>
+  <div class="vital-box">
+    <div class="vital-box-label">SpO2</div>
+    <div><span class="vital-box-val">${rows[0]?rows[0][2]:'--'}</span><span class="vital-box-unit">%</span></div>
+  </div>
+  <div class="vital-box">
+    <div class="vital-box-label">ECG Signal</div>
+    <div><span class="vital-box-val">${rows[0]?rows[0][3]:'--'}</span><span class="vital-box-unit">ADC</span></div>
+  </div>
+</div>
+
+<div class="section-title">Vitals History (Last ${Math.min(rows.length, 20)} Records)</div>
+<table>
+  <thead><tr><th>Timestamp</th><th>Heart Rate (BPM)</th><th>SpO2 (%)</th><th>ECG (ADC)</th><th>Source</th></tr></thead>
+  <tbody>${vitalsRows || '<tr><td colspan="5" style="text-align:center;padding:16px;color:#9ca3af">No vitals data available</td></tr>'}</tbody>
+</table>
+
+<div class="footer">
+  <span>MediCore Health Platform &mdash; Confidential Patient Record &mdash; For authorised use only</span>
+  <span>Generated: ${new Date().toLocaleString('en-GB')} &mdash; Device: ${p.device}</span>
+</div>
+
+<script>setTimeout(()=>window.print(), 600);<\/script>
+</body></html>`;
+  openHtmlInNewTab(html);
+  showToast('Patient PDF report opened — use browser print (Ctrl+P) to save as PDF');
+}
+
+function downloadPatientExcel() {
+  const pid = document.getElementById('dl-patient-select').value;
+  const { p, headers, rows } = _getPatientRows(pid);
+  const infoRows = [['Full Name',p.name],['Age',p.age],['DOB',p.dob],['Gender',p.gender],['Blood Group',p.blood],['Doctor',p.doctor],['Ward / Bed',p.ward+' / '+p.bed],['Purpose',p.purpose],['Mobile',p.mobile]];
+  const allHeaders = ['Field/Timestamp','Value / HR (BPM)','— / SpO2 (%)','— / ECG (ADC)','— / Source'];
+  const allRows = [...infoRows.map(r=>[r[0],r[1],'','','']), ['---VITALS HISTORY---','','','',''], headers.map(h=>h), ...rows];
+  const xlsx = buildXlsx(p.name + ' — Vitals', allHeaders, allRows);
+  triggerXlsxDownload(xlsx, `patient_${pid}_data.xls`);
+  showToast('Patient Excel downloaded');
+}
+function openPatientWebpage() {
+  const pid = document.getElementById('dl-patient-select').value;
+  const { p, headers, rows } = _getPatientRows(pid);
+  openTableWebpage(
+    'Patient Vitals — ' + p.name,
+    `Patient ID: ${pid} | Doctor: ${p.doctor} | Ward: ${p.ward} Bed: ${p.bed} | Blood: ${p.blood} | Generated: ${new Date().toLocaleString()}`,
+    headers, rows
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECURITY LOG
+══════════════════════════════════════════════════════════════ */
+function _getSecurityRows() {
+  const events = _allSecurityEvents || [];
+  const headers = ['Timestamp','Attack Type','Device ID','Patient','Reason','Severity','Status'];
+  const rows = events.map(ev => [
+    ev.timestamp||'', ev.event_type||ev.attack_type||'', ev.device_id||'',
+    (ev.patient_id||'').replace('_',' '), ev.reason||'', ev.severity||'', ev.status||'Blocked'
+  ]);
+  return { headers, rows };
+}
+function downloadSecurityExcel() {
+  if (!_lastData) { showToast('No data yet — please wait for first fetch'); return; }
+  const { headers, rows } = _getSecurityRows();
+  const xlsx = buildXlsx('Security Logs', headers, rows);
+  triggerXlsxDownload(xlsx, 'security_log.xls');
+  showToast('Security log Excel downloaded');
+}
+function openSecurityWebpage() {
+  if (!_lastData) { showToast('No data yet — please wait for first fetch'); return; }
+  const { headers, rows } = _getSecurityRows();
+  openTableWebpage('Security Attack Log', `DynamoDB SecurityLogs | ${rows.length} event${rows.length!==1?'s':''} | Generated: ${new Date().toLocaleString()}`, headers, rows);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BLOCKCHAIN
+══════════════════════════════════════════════════════════════ */
+function _getBlockchainRows() {
+  const hist = (_lastData && _lastData.history) || {};
+  const headers = ['Block #','Timestamp','Heart Rate (BPM)','SpO2 (%)','ECG (ADC)'];
+  const rows = (hist.timestamps||[]).map((ts,i) => [i+1, ts, hist.heart_rate[i]??'', hist.spo2[i]??'', hist.ecg[i]??'']);
+  return { headers, rows };
+}
+function downloadBlockchainExcel() {
+  if (!_lastData) { showToast('No data yet'); return; }
+  const { headers, rows } = _getBlockchainRows();
+  const xlsx = buildXlsx('Blockchain Ledger', headers, rows);
+  triggerXlsxDownload(xlsx, 'blockchain_ledger.xls');
+  showToast('Blockchain Excel downloaded');
+}
+function openBlockchainWebpage() {
+  if (!_lastData) { showToast('No data yet'); return; }
+  const { headers, rows } = _getBlockchainRows();
+  openTableWebpage(
+    'Blockchain Ledger',
+    `Chain length: ${_lastData.chain_length||0} blocks | Valid: ${_lastData.chain_valid ? 'Yes ✓' : 'Check needed'} | Generated: ${new Date().toLocaleString()}`,
+    headers, rows
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SYSTEM REPORT PDF
+══════════════════════════════════════════════════════════════ */
+function downloadSystemReport(){
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>System Report</title><style>body{font-family:'Segoe UI',sans-serif;margin:32px;color:#1a1a2e;font-size:13px}h1{font-size:22px;color:#0d1b2a;border-bottom:2px solid #1a6eb5;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#0d1b2a;color:white;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase}td{padding:8px 12px;border-bottom:1px solid #e5e7eb}</style></head><body><h1>System Configuration Report</h1><p style="color:#666;font-size:11px;margin-bottom:24px">MediCore Health Platform | ${new Date().toLocaleString()}</p><table><tr><th colspan="2">Hospital</th></tr><tr><td>Hospital Name</td><td>${document.getElementById('st-hospital').value}</td></tr><tr><td>Hospital ID</td><td>${document.getElementById('st-hospital-id').value}</td></tr><tr><td>Department</td><td>${document.getElementById('st-dept').value}</td></tr><tr><td>Contact</td><td>${document.getElementById('st-contact').value}</td></tr></table><table><tr><th colspan="2">AWS Architecture</th></tr><tr><td>Transport</td><td>ESP32 → MQTT → AWS IoT Core</td></tr><tr><td>Processing</td><td>IoT Rule → HealthProcessor Lambda</td></tr><tr><td>Storage</td><td>DynamoDB: PatientData + SecurityLogs</td></tr><tr><td>API</td><td>API Gateway → DashboardAPI Lambda → GET /dashboard</td></tr><tr><td>Frontend</td><td>S3 Static Website</td></tr></table><table><tr><th colspan="2">Security</th></tr><tr><td>Encryption</td><td>AES-256-CBC (per-packet IV)</td></tr><tr><td>Signature</td><td>HMAC-SHA256 (constant-time)</td></tr><tr><td>Blockchain</td><td>Consortium — Hash-chained + HMAC signed</td></tr><tr><td>Chain Length</td><td>${_lastData?.chain_length||'—'} blocks</td></tr><tr><td>Chain Valid</td><td>${_lastData?.chain_valid??'—'}</td></tr></table><script>setTimeout(()=>window.print(),600);<\/script></body></html>`;
+  openHtmlInNewTab(html);
+  showToast('System report opened — use browser print (Ctrl+P) to save as PDF');
+}
+
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3500); }
+
+/* ══════════════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════════════ */
+loadPatient1FromStorage();
+(function syncP1TabLabel() {
+  const p = PATIENTS['Patient_1'];
+  const firstTab = document.querySelector('.ptab'); if (firstTab) firstTab.textContent = 'P1 — ' + p.name;
+  const opt = document.querySelector('#dl-patient-select option[value="Patient_1"]'); if (opt) opt.textContent = 'Patient 1 — ' + p.name;
+})();
+Object.keys(simState).forEach(pid=>fluctuate(pid));
+selectPatient('Patient_1', document.querySelector('.ptab'));
+restoreLoginState();
+updateClock();
+setInterval(updateClock, 1000);
+setInterval(fetchDashboard, 5000);
+fetchDashboard();
+</script>
+</body>
+</html>
