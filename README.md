@@ -94,6 +94,7 @@ The system provides a real-time web dashboard to visualize patient health data a
 Live Demo
 
 CloudFront URL:(https://d23u3a6vyhs3yb.cloudfront.net/)
+
 Expected Outcome
 
 The proposed system improves patient safety, data authenticity, and trust in IoT healthcare systems by ensuring that medical decisions are based only on verified and secure patient data. It also provides early detection of cyber attacks within hospital monitoring networks.
